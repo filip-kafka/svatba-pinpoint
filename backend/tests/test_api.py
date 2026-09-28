@@ -166,3 +166,18 @@ def test_iphone_heic_with_rotation(client):
     served = Image.open(io.BytesIO(client.get(f"/media/{item['id']}.jpg").content))
     assert served.size[0] < served.size[1], "rotation must be baked in"
     assert not served.getexif()
+
+
+def test_map_config_defaults_to_keyless_osm(client):
+    cfg = client.get("/api/map-config").json()
+    assert "tile.openstreetmap.org" in cfg["url"] and "OpenStreetMap" in cfg["attribution"]
+
+
+def test_map_config_uses_carto_key(tmp_path, monkeypatch):
+    monkeypatch.setenv("PINPOINT_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("PINPOINT_ADMIN_TOKEN", TOKEN)
+    monkeypatch.setenv("PINPOINT_CARTO_KEY", "abc123")
+    with TestClient(create_app()) as c:
+        cfg = c.get("/api/map-config").json()
+    assert cfg["url"].startswith("https://basemaps.cartocdn.com/") and cfg["url"].endswith("?key=abc123")
+    assert "CARTO" in cfg["attribution"]

@@ -51,6 +51,12 @@ def create_app() -> FastAPI:
 
     admin = [Depends(require_admin)]
 
+    # --------------------------------------------------------- public API
+
+    @app.get("/api/map-config")
+    def map_config() -> dict:
+        return settings.tiles
+
     # ------------------------------------------------------------ admin API
 
     @app.get("/api/admin/check", dependencies=admin, status_code=204)

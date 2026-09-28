@@ -145,7 +145,10 @@ The service must run with **one worker**, because the game lives in memory. The 
 
 - **Colours and fonts:** edit the variables at the top of `frontend/src/styles/base.css` (`--accent`, `--paper`, …).
 - **Texts, in both languages:** edit `frontend/src/shared/i18n.ts`.
-- **Map tiles:** `TILES` in `frontend/src/shared/map.ts`. The default is CARTO Voyager, which is free for a small private event.
+- **Map tiles:** set in `.env`, no rebuild needed. See `tile_config()` in `backend/app/config.py`.
+  - No key: OpenStreetMap's standard tiles.
+  - `PINPOINT_CARTO_KEY=…`: CARTO Voyager, a calmer map that looks better on a projector. The [key is free](https://carto.com/basemaps/apikey/) for non-commercial use, up to 5 million tiles a month. A wedding uses a few tens of thousands.
+  - `PINPOINT_TILES_URL=…` (+ `PINPOINT_TILES_ATTRIBUTION`): any other Leaflet tile URL.
 - **Scoring:** `backend/app/scoring.py`.
 - **Time added by +15 s:** `EXTEND_SECONDS` in `backend/app/hub.py`.
 

@@ -1,17 +1,28 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
+interface TileConfig {
+  url: string;
+  attribution: string;
+  maxZoom: number;
+}
+
 /**
- * Map tiles. CARTO's free basemaps are fine for a one-off private event of a
- * hundred people; swap in another provider here if you prefer (see README).
+ * The server decides which tiles to use (see PINPOINT_CARTO_KEY / PINPOINT_TILES_URL
+ * in the README), so switching provider or adding a key needs no rebuild.
  */
-export const TILES = {
-  url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-  attribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-  subdomains: "abcd",
-  maxZoom: 19,
-};
+let tileConfig: Promise<TileConfig> | null = null;
+function loadTileConfig(): Promise<TileConfig> {
+  tileConfig ??= fetch("/api/map-config")
+    .then((r) => r.json() as Promise<TileConfig>)
+    .catch(() => ({
+      url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }));
+  return tileConfig;
+}
+void loadTileConfig(); // start fetching as soon as the page loads
 
 export function createMap(el: HTMLElement, opts: L.MapOptions = {}): L.Map {
   const map = L.map(el, {
@@ -23,12 +34,10 @@ export function createMap(el: HTMLElement, opts: L.MapOptions = {}): L.Map {
     attributionControl: true,
     ...opts,
   }).setView([30, 10], 1.5);
-  L.tileLayer(TILES.url, {
-    attribution: TILES.attribution,
-    subdomains: TILES.subdomains,
-    maxZoom: TILES.maxZoom,
-  }).addTo(map);
   map.attributionControl.setPrefix(false);
+  void loadTileConfig().then((cfg) => {
+    L.tileLayer(cfg.url, { attribution: cfg.attribution, maxZoom: cfg.maxZoom }).addTo(map);
+  });
   return map;
 }
 
