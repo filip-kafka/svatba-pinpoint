@@ -1,0 +1,17 @@
+# Base setup: the app on port 8000. Put it behind the HTTPS reverse proxy you
+# already run, or add Caddy with:
+#   docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
+services:
+  pinpoint:
+    build: .
+    image: pinpoint:latest
+    restart: unless-stopped
+    environment:
+      PINPOINT_ADMIN_TOKEN: ${PINPOINT_ADMIN_TOKEN:?set PINPOINT_ADMIN_TOKEN in .env}
+    volumes:
+      - pinpoint-data:/data
+    ports:
+      - "127.0.0.1:8000:8000"
+
+volumes:
+  pinpoint-data:

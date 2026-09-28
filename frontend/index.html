@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fbf7f1" />
+    <meta name="robots" content="noindex" />
+    <title>Pinpoint</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 44%22><path d=%22M16 43c-1-4-4-8.5-8-13.5C4.5 25 1.5 21 1.5 15.5a14.5 14.5 0 0 1 29 0c0 5.5-3 9.5-6.5 14-4 5-7 9.5-8 13.5z%22 fill=%22%239c4a5a%22/></svg>" />
+  </head>
+  <body>
+    <main id="app" class="player">
+      <header class="topbar">
+        <div class="me" hidden>
+          <span class="me-name"></span>
+          <span class="me-points tabular"></span>
+        </div>
+        <span class="round-label muted tabular"></span>
+        <button class="btn lang-toggle" type="button"></button>
+      </header>
+
+      <div class="timer" hidden>
+        <div class="timer-fill"></div>
+        <span class="timer-text tabular"></span>
+      </div>
+
+      <section class="views">
+        <!-- 1. Join -->
+        <div data-view="join" class="join">
+          <div class="join-inner">
+            <svg class="join-pin" viewBox="0 0 32 44" aria-hidden="true"><path d="M16 43c-1-4-4-8.5-8-13.5C4.5 25 1.5 21 1.5 15.5a14.5 14.5 0 0 1 29 0c0 5.5-3 9.5-6.5 14-4 5-7 9.5-8 13.5z" fill="currentColor"/><path d="M16 22.5s-7-4.3-7-9a3.8 3.8 0 0 1 7-2.1 3.8 3.8 0 0 1 7 2.1c0 4.7-7 9-7 9z" fill="#fff"/></svg>
+            <h1 class="display title"></h1>
+            <p class="subtitle muted"></p>
+            <form class="join-form">
+              <label><span data-t="yourName"></span>
+                <input name="name" maxlength="20" autocomplete="off" autocapitalize="words" enterkeyhint="go" required />
+              </label>
+              <button class="btn btn-primary join-btn" type="submit" data-t="join"></button>
+              <p class="join-error" role="alert" hidden></p>
+            </form>
+          </div>
+        </div>
+
+        <!-- 2. Waiting in the lobby -->
+        <div data-view="lobby" class="center-view">
+          <div class="pulse-dot" aria-hidden="true"></div>
+          <h1 class="display lobby-hello"></h1>
+          <p class="muted" data-t="watchScreen"></p>
+          <p class="muted lobby-count tabular"></p>
+        </div>
+
+        <!-- 3. Guessing + reveal (shares one map) -->
+        <div data-view="play" class="play">
+          <button class="photo" type="button">
+            <img alt="" />
+            <span class="photo-zoom" data-t="tapToZoom"></span>
+          </button>
+          <div class="map-wrap">
+            <div id="map"></div>
+          </div>
+          <div class="action">
+            <div class="action-guess">
+              <p class="hint" data-t="tapMap"></p>
+              <button class="btn btn-primary lock-btn" type="button" disabled data-t="lockIn"></button>
+            </div>
+            <div class="action-status">
+              <strong class="status-title"></strong>
+              <span class="status-sub muted"></span>
+            </div>
+            <div class="action-result">
+              <div class="result-points display tabular"></div>
+              <div class="result-distance muted tabular"></div>
+              <div class="result-caption"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Between rounds / final -->
+        <div data-view="standing" class="center-view standing">
+          <p class="standing-kicker muted"></p>
+          <div class="rank display tabular"></div>
+          <div class="rank-change tabular"></div>
+          <p class="standing-total tabular"></p>
+          <ol class="podium-list" hidden></ol>
+          <p class="standing-foot muted"></p>
+        </div>
+
+        <!-- 5. Removed / game reset -->
+        <div data-view="gone" class="center-view">
+          <h1 class="display gone-title"></h1>
+          <button class="btn btn-primary rejoin-btn" type="button" data-t="joinAgain"></button>
+        </div>
+      </section>
+
+      <div class="lightbox" hidden><img alt="" /></div>
+      <div class="connection-lost" hidden data-t="reconnecting"></div>
+    </main>
+    <script type="module" src="/src/player.ts"></script>
+  </body>
+</html>

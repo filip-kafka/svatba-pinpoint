@@ -1,0 +1,25 @@
+{
+  "name": "pinpoint-frontend",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^26.6.3",
+    "@types/qrcode": "^1.5.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource/fraunces": "^5.3.0",
+    "canvas-confetti": "^1.9.4",
+    "leaflet": "^1.9.4",
+    "qrcode": "^1.5.4"
+  },
+  "private": true,
+  "type": "module"
+}

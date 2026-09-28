@@ -1,0 +1,19 @@
+# Adds Caddy in front of the app: automatic Let's Encrypt HTTPS + WebSockets.
+# Needs ports 80 and 443 free on the VPS and a DNS record for PINPOINT_DOMAIN.
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PINPOINT_DOMAIN: ${PINPOINT_DOMAIN:?set PINPOINT_DOMAIN in .env}
+    command: caddy reverse-proxy --from ${PINPOINT_DOMAIN} --to pinpoint:8000
+    volumes:
+      - caddy-data:/data
+    depends_on:
+      - pinpoint
+
+volumes:
+  caddy-data:

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Pinpoint – host</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 44%22><path d=%22M16 43c-1-4-4-8.5-8-13.5C4.5 25 1.5 21 1.5 15.5a14.5 14.5 0 0 1 29 0c0 5.5-3 9.5-6.5 14-4 5-7 9.5-8 13.5z%22 fill=%22%239c4a5a%22/></svg>" />
+  </head>
+  <body>
+    <main id="app" class="host">
+      <section class="stage" hidden>
+        <!-- Lobby -->
+        <div data-view="lobby" class="lobby">
+          <div class="lobby-left">
+            <h1 class="display lobby-title"></h1>
+            <p class="lobby-subtitle"></p>
+            <div class="join-box">
+              <div class="qr"></div>
+              <div>
+                <p class="join-label muted"></p>
+                <p class="join-url display"></p>
+                <p class="lobby-warnings"></p>
+              </div>
+            </div>
+          </div>
+          <div class="lobby-right">
+            <h2 class="players-heading"><span class="lobby-players-label"></span> <span class="count tabular"></span></h2>
+            <ul class="chips"></ul>
+            <p class="chips-empty muted"></p>
+          </div>
+        </div>
+
+        <!-- Question -->
+        <div data-view="question" class="question">
+          <div class="q-photo"><img alt="" /></div>
+          <aside class="q-side">
+            <p class="q-round muted tabular"></p>
+            <div class="ring">
+              <svg viewBox="0 0 120 120" aria-hidden="true">
+                <circle cx="60" cy="60" r="52" class="ring-bg" />
+                <circle cx="60" cy="60" r="52" class="ring-fg" />
+              </svg>
+              <span class="ring-text display tabular"></span>
+            </div>
+            <p class="q-answered"><strong class="tabular"></strong> <span class="muted"></span></p>
+            <p class="q-closed display"></p>
+            <p class="q-join muted"></p>
+          </aside>
+        </div>
+
+        <!-- Reveal -->
+        <div data-view="reveal" class="reveal">
+          <div id="reveal-map"></div>
+          <aside class="reveal-panel card">
+            <img class="reveal-thumb" alt="" />
+            <h2 class="display reveal-caption"></h2>
+            <h3 class="reveal-closest-label"></h3>
+            <ol class="closest"></ol>
+          </aside>
+        </div>
+
+        <!-- Leaderboard -->
+        <div data-view="leaderboard" class="board">
+          <h1 class="display board-title"></h1>
+          <p class="board-round muted tabular"></p>
+          <ol class="board-list"></ol>
+        </div>
+
+        <!-- Final -->
+        <div data-view="final" class="final">
+          <h1 class="display final-title"></h1>
+          <div class="podium"></div>
+          <ol class="final-rest"></ol>
+        </div>
+
+        <p class="hint"></p>
+      </section>
+
+      <nav class="dock" hidden>
+        <button class="btn btn-primary" data-act="advance"></button>
+        <button class="btn" data-act="extend"></button>
+        <button class="btn" data-act="close"></button>
+        <button class="btn" data-act="players"></button>
+        <button class="btn lang-toggle" data-act="lang"></button>
+        <button class="btn" data-act="fullscreen" title="F">⛶</button>
+        <details class="dock-menu">
+          <summary class="btn">⋯</summary>
+          <div class="card">
+            <button class="btn btn-danger" data-act="reset"></button>
+            <button class="btn btn-danger" data-act="reset_all"></button>
+            <a class="btn" href="/admin" target="_blank" rel="noopener">Admin</a>
+          </div>
+        </details>
+      </nav>
+
+      <aside class="drawer card" hidden>
+        <header><h2 class="drawer-title"></h2><button class="btn btn-icon" data-act="players">✕</button></header>
+        <ul class="drawer-list"></ul>
+      </aside>
+
+      <div class="connection-lost" hidden></div>
+      <div class="login-root"></div>
+    </main>
+    <script type="module" src="/src/host.ts"></script>
+  </body>
+</html>

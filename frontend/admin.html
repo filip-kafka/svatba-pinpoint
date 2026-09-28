@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Pinpoint – admin</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 44%22><path d=%22M16 43c-1-4-4-8.5-8-13.5C4.5 25 1.5 21 1.5 15.5a14.5 14.5 0 0 1 29 0c0 5.5-3 9.5-6.5 14-4 5-7 9.5-8 13.5z%22 fill=%22%239c4a5a%22/></svg>" />
+  </head>
+  <body>
+    <main id="app" class="admin" hidden>
+      <header class="admin-head">
+        <h1 class="display">Pinpoint <span class="muted">admin</span></h1>
+        <nav>
+          <a class="btn" href="/host" target="_blank" rel="noopener">Open projector screen ↗</a>
+          <a class="btn" href="/" target="_blank" rel="noopener">Player page ↗</a>
+        </nav>
+      </header>
+
+      <p class="running-banner" hidden>
+        A game is in progress. Changes apply to the <strong>next</strong> game (host screen → ⋯ → New game).
+      </p>
+
+      <section class="card settings">
+        <h2>Game settings</h2>
+        <form class="settings-form">
+          <label>Title (CZ) <input name="title_cs" maxlength="80" /></label>
+          <label>Title (EN) <input name="title_en" maxlength="80" /></label>
+          <label>Subtitle (CZ) <input name="subtitle_cs" maxlength="160" placeholder="e.g. Anna & Tomáš · 12. 6. 2027" /></label>
+          <label>Subtitle (EN) <input name="subtitle_en" maxlength="160" /></label>
+          <label>Seconds per photo <input name="default_time_limit" type="number" min="5" max="600" step="5" /></label>
+          <div class="settings-actions"><button class="btn btn-primary" type="submit">Save settings</button></div>
+        </form>
+      </section>
+
+      <section class="card upload">
+        <label class="dropzone">
+          <input type="file" accept="image/*,.heic,.heif" multiple hidden />
+          <strong>Drop photos here or click to choose</strong>
+          <span class="muted">JPEG, PNG or iPhone HEIC. GPS location is read from the photo automatically when present;
+            all metadata is removed before guests see the photo.</span>
+          <span class="upload-progress" hidden></span>
+        </label>
+      </section>
+
+      <section class="photos">
+        <div class="photos-head">
+          <h2>Photos</h2>
+          <p class="photos-summary muted"></p>
+        </div>
+        <ol class="photo-list"></ol>
+      </section>
+    </main>
+
+    <dialog class="editor">
+      <form method="dialog" class="editor-inner">
+        <div class="editor-photo"><img alt="" /></div>
+        <div class="editor-side">
+          <div class="editor-search">
+            <input class="search-input" placeholder="Search a place… (Enter)" />
+            <ul class="search-results"></ul>
+          </div>
+          <div class="editor-map"></div>
+          <div class="editor-bottom">
+            <input class="coords-input" placeholder="or paste coordinates: 50.0875, 14.4213" />
+            <span class="coords-readout muted tabular"></span>
+            <button class="btn" value="cancel">Cancel</button>
+            <button class="btn btn-primary editor-save" value="save" disabled>Save location</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="login-root"></div>
+    <script type="module" src="/src/admin.ts"></script>
+  </body>
+</html>

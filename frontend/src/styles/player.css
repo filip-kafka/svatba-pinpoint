@@ -1,0 +1,351 @@
+/* Phone screen. Designed for one-handed use at a table: big targets, map fills the screen. */
+
+.player {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  overflow: hidden;
+  padding-top: env(safe-area-inset-top);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+  min-height: 52px;
+}
+.me {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+.me-name {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.me-points {
+  font-size: 0.8rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+.round-label {
+  margin-left: auto;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.topbar .lang-toggle {
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- timer */
+
+.timer {
+  position: relative;
+  height: 28px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+.timer-fill {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--accent) 22%, var(--paper-2));
+  transform-origin: left center;
+  transition: transform 0.2s linear;
+}
+.timer-text {
+  position: relative;
+  display: block;
+  text-align: center;
+  font-weight: 700;
+  line-height: 28px;
+  font-size: 0.9rem;
+}
+.timer.urgent .timer-fill {
+  background: color-mix(in srgb, var(--danger) 35%, var(--paper-2));
+}
+.timer.urgent .timer-text {
+  color: var(--danger);
+}
+
+/* Explicit rows: the timer is display:none outside questions and would
+   otherwise let .views slide into its auto-height row. */
+.topbar {
+  grid-row: 1;
+}
+.timer {
+  grid-row: 2;
+}
+.views {
+  grid-row: 3;
+  min-height: 0;
+  position: relative;
+}
+.views > [data-view] {
+  height: 100%;
+}
+
+/* ----------------------------------------------------------------- join */
+
+.join {
+  display: grid;
+  place-items: center;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+.join-inner {
+  width: min(380px, 100%);
+  text-align: center;
+}
+.join-pin {
+  width: 44px;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.join .title {
+  font-size: clamp(2rem, 9vw, 2.6rem);
+  margin: 0 0 6px;
+}
+.join .subtitle {
+  margin: 0 0 28px;
+}
+.join .subtitle:empty {
+  margin-bottom: 20px;
+}
+.join-form {
+  display: grid;
+  gap: 14px;
+  text-align: left;
+}
+.join-form input {
+  font-size: 1.15rem;
+  padding: 0.8em 0.9em;
+}
+.join-btn {
+  font-size: 1.1rem;
+  padding: 0.85em;
+}
+.join-error {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* --------------------------------------------------------- centre views */
+
+.center-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  gap: 4px;
+}
+.center-view h1 {
+  font-size: clamp(1.7rem, 8vw, 2.3rem);
+  margin: 8px 0;
+}
+.center-view p {
+  margin: 4px 0;
+  max-width: 30ch;
+}
+.pulse-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.6s ease-in-out infinite;
+  margin-bottom: 12px;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 16px transparent;
+  }
+}
+
+/* ----------------------------------------------------------------- play */
+
+.play {
+  display: grid;
+  grid-template-rows: clamp(150px, 30dvh, 280px) 1fr auto;
+  min-height: 0;
+}
+.photo {
+  all: unset;
+  position: relative;
+  display: block;
+  background: #1c1a18;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+.photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.photo-zoom {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.map-wrap {
+  position: relative;
+  min-height: 0;
+}
+#map {
+  position: absolute;
+  inset: 0;
+}
+
+.action {
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  min-height: 76px;
+}
+.action > div {
+  display: none;
+}
+.action[data-mode="guess"] .action-guess,
+.action[data-mode="status"] .action-status,
+.action[data-mode="result"] .action-result {
+  display: flex;
+}
+.action-guess {
+  align-items: center;
+  gap: 12px;
+}
+.hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  flex: 1;
+  line-height: 1.3;
+}
+.lock-btn {
+  flex: none;
+  font-size: 1.05rem;
+  padding: 0.8em 1.3em;
+}
+.action-status,
+.action-result {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+}
+.status-title {
+  font-size: 1.1rem;
+}
+.result-points {
+  font-size: 1.7rem;
+  color: var(--accent);
+}
+.result-caption {
+  font-weight: 600;
+  margin-top: 2px;
+}
+.result-caption:empty {
+  display: none;
+}
+
+/* ------------------------------------------------------------- standing */
+
+.standing .rank {
+  font-size: clamp(4.5rem, 26vw, 7rem);
+  color: var(--accent);
+  line-height: 1;
+  margin: 8px 0 4px;
+}
+.standing-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.standing-total {
+  font-weight: 600;
+}
+.rank-change {
+  font-weight: 700;
+  min-height: 1.4em;
+}
+.rank-change.up {
+  color: var(--ok);
+}
+.rank-change.down {
+  color: var(--danger);
+}
+.podium-list {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 8px;
+  width: min(340px, 100%);
+  display: grid;
+  gap: 8px;
+}
+.podium-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  text-align: left;
+}
+.podium-name {
+  flex: 1;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.podium-total {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.medal {
+  font-size: 1.3rem;
+}
+
+/* ------------------------------------------------------------- lightbox */
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 18, 16, 0.94);
+  display: grid;
+  place-items: center;
+  z-index: 5000;
+  cursor: zoom-out;
+  touch-action: pinch-zoom;
+}
+.lightbox img {
+  max-width: 100vw;
+  max-height: 100dvh;
+  object-fit: contain;
+}
+
+.leaflet-control-attribution {
+  font-size: 9px;
+}

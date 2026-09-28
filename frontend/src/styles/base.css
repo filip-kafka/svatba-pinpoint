@@ -1,0 +1,261 @@
+/*
+ * Theme. Change the variables in :root to restyle every screen at once -
+ * e.g. match the wedding colours by editing --accent and --paper.
+ */
+:root {
+  --paper: #fbf7f1;
+  --paper-2: #f3ece1;
+  --card: #fffdf9;
+  --ink: #2a2724;
+  --ink-soft: #6b645c;
+  --line: #e4dacb;
+  --accent: #9c4a5a;
+  --accent-ink: #ffffff;
+  --accent-soft: #f4e3e5;
+  --guess: #2f5d7c;
+  --gold: #b8913e;
+  --silver: #8d99a4;
+  --bronze: #a8703f;
+  --ok: #4e7d5b;
+  --danger: #b3412f;
+
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(42, 39, 36, 0.06), 0 8px 24px rgba(42, 39, 36, 0.08);
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  font-optical-sizing: auto;
+}
+
+.muted {
+  color: var(--ink-soft);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------ controls */
+
+.btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  padding: 0.7em 1.2em;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease, opacity 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  text-decoration: none;
+}
+.btn:hover {
+  background: var(--paper-2);
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, black);
+}
+.btn-danger {
+  color: var(--danger);
+}
+.btn-small {
+  padding: 0.4em 0.8em;
+  font-size: 0.875rem;
+}
+.btn-icon {
+  padding: 0.45em 0.7em;
+  min-width: 2.4em;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.65em 0.8em;
+  width: 100%;
+}
+input:focus,
+select:focus,
+textarea:focus,
+.btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+label {
+  display: grid;
+  gap: 0.35em;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.lang-toggle {
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  padding: 0.35em 0.7em;
+}
+
+/* --------------------------------------------------------------- login */
+
+.login {
+  width: min(360px, calc(100vw - 32px));
+  margin: 12vh auto;
+  padding: 28px;
+  display: grid;
+  gap: 16px;
+}
+.login h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: var(--accent);
+}
+.login-error {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------- toasts */
+
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: grid;
+  gap: 8px;
+  z-index: 10000;
+  pointer-events: none;
+  width: min(420px, calc(100vw - 32px));
+}
+.toast {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: var(--shadow);
+  animation: toast-in 0.2s ease-out;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.toast-error {
+  background: var(--danger);
+}
+.toast.out {
+  opacity: 0;
+  transform: translateY(8px);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ----------------------------------------------------------------- map */
+
+.leaflet-container {
+  font-family: var(--font-body);
+  background: #d4dadc;
+}
+.pin {
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
+}
+.pin svg {
+  display: block;
+}
+.pin-answer svg {
+  animation: pin-drop 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  transform-origin: 50% 100%;
+}
+@keyframes pin-drop {
+  from {
+    transform: translateY(-40px) scale(0.6);
+    opacity: 0;
+  }
+}
+
+.connection-lost {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--paper);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 9999;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
