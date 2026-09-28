@@ -384,6 +384,59 @@ body.idle .hint {
   padding: 3px 8px;
 }
 
+/* Edge pointers to the closest guesses when none are in view. */
+.reveal-pointers {
+  position: absolute;
+  inset: 0;
+  z-index: 650;
+  pointer-events: none;
+}
+.pointer {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  max-width: 280px;
+  padding: 0.4em 0.9em 0.4em 0.5em;
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  font-size: clamp(14px, 1.05vw, 22px);
+  white-space: nowrap;
+  animation: pointer-in 0.4s ease-out both;
+}
+@keyframes pointer-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.7);
+  }
+}
+.pointer-arrow {
+  width: 1.5em;
+  height: 1.5em;
+  flex: none;
+  color: var(--accent);
+}
+.pointer-rank {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--guess);
+}
+.pointer.top .pointer-rank {
+  color: var(--gold);
+}
+.pointer-name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pointer-dist {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
 /* ---------------------------------------------------------- leaderboard */
 
 .board {

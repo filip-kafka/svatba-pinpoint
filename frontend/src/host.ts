@@ -10,7 +10,7 @@ import { $, esc, showView, toast } from "./shared/dom";
 import { errorText, formatDistance, formatNumber, lang, onLangChange, pick, t, toggleLang } from "./shared/i18n";
 import { answerIcon, createMap, flyThen, guessDotIcon, L, nearLng } from "./shared/map";
 import { LiveSocket, ServerClock } from "./shared/socket";
-import type { HostState, LeaderRow, ServerMessage } from "./shared/types";
+import type { HostState, LeaderRow, Scale, ServerMessage } from "./shared/types";
 
 const stage = $(".stage");
 const dock = $(".dock");
@@ -181,28 +181,41 @@ function renderQuestion(s: HostState, fresh: boolean): void {
 
 let revealMap: L.Map | null = null;
 let revealToken = 0;
+let flying = false;
 const revealLayer = L.layerGroup();
+
+/** How far the reveal zooms in, by the photo's scoring scale (admin → Scoring). */
+const REVEAL_ZOOM: Record<Scale, number> = { world: 7, continent: 8, country: 9, city: 13 };
+
+/** What the edge pointers need: the answer and the five closest guesses (already sorted). */
+let pointerData: { answer: L.LatLng; closest: { name: string; ll: L.LatLng; distance_km: number }[] } | null = null;
+
+/** Width of map hidden under the side panel, so "on screen" means actually visible. */
+function panelInset(): number {
+  const mapRect = $("#reveal-map").getBoundingClientRect();
+  const panel = $(".reveal-panel").getBoundingClientRect();
+  return Math.max(0, mapRect.right - panel.left);
+}
 
 function renderReveal(s: HostState): void {
   if (!revealMap) {
     revealMap = createMap($("#reveal-map"), { zoomControl: false, attributionControl: true });
     revealLayer.addTo(revealMap);
+    revealMap.on("moveend", () => { if (!flying) renderPointers(); });
+    window.addEventListener("resize", () => { if (state?.phase === "reveal" && !flying) renderPointers(); });
   }
   const m = revealMap;
   requestAnimationFrame(() => m.invalidateSize());
   revealLayer.clearLayers();
+  $(".reveal-pointers").innerHTML = "";
 
   const a = s.answer!;
   const answer = L.latLng(a.lat, a.lng);
-  const guesses = s.guesses ?? [];
-  const points: L.LatLng[] = [answer];
+  const guesses = (s.guesses ?? []).map((g) => ({ ...g, ll: L.latLng(g.lat, nearLng(g.lng, a.lng)) }));
+  pointerData = { answer, closest: guesses.slice(0, 5) };
 
-  const lines: L.LatLng[] = [];
   guesses.forEach((g, i) => {
-    const ll = L.latLng(g.lat, nearLng(g.lng, a.lng));
-    points.push(ll);
-    lines.push(ll);
-    const dot = L.marker(ll, { icon: guessDotIcon(i < 3), keyboard: false, zIndexOffset: i < 3 ? 500 - i : 0 })
+    const dot = L.marker(g.ll, { icon: guessDotIcon(i < 3), keyboard: false, zIndexOffset: i < 3 ? 500 - i : 0 })
       .addTo(revealLayer);
     if (i < 3) {
       // Spread the three labels so nearby guesses don't cover each other.
@@ -214,7 +227,7 @@ function renderReveal(s: HostState): void {
   L.marker(answer, { icon: answerIcon, zIndexOffset: 1000, keyboard: false }).addTo(revealLayer);
 
   const drawLines = () => {
-    lines.forEach((ll) => L.polyline([ll, answer], {
+    guesses.forEach((g) => L.polyline([g.ll, answer], {
       color: "#2a2724", weight: 1.5, opacity: 0.25, dashArray: "4 6", className: "reveal-line", interactive: false,
     }).addTo(revealLayer));
   };
@@ -224,13 +237,16 @@ function renderReveal(s: HostState): void {
   setTimeout(() => {
     if (token !== revealToken) return; // a newer reveal (or language switch) took over
     const duration = 1.8;
-    flyThen(m, () => {
-      if (points.length > 1) {
-        m.flyToBounds(L.latLngBounds(points), { padding: [70, 70], paddingBottomRight: [460, 70], maxZoom: 13, duration });
-      } else {
-        m.flyTo(answer, 6, { duration });
-      }
-    }, () => { if (token === revealToken) drawLines(); }, duration);
+    const zoom = REVEAL_ZOOM[a.scale] ?? REVEAL_ZOOM.world;
+    // Centre the answer in the part of the map the side panel doesn't cover.
+    const center = m.unproject(m.project(answer, zoom).add([panelInset() / 2, 0]), zoom);
+    flying = true;
+    flyThen(m, () => m.flyTo(center, zoom, { duration }), () => {
+      flying = false;
+      if (token !== revealToken) return;
+      drawLines();
+      renderPointers();
+    }, duration);
   }, 350);
 
   $<HTMLImageElement>(".reveal-thumb").src = s.photo ?? "";
@@ -243,6 +259,68 @@ function renderReveal(s: HostState): void {
       <span class="c-dist muted tabular">${esc(formatDistance(g.distance_km))}</span>
       <span class="c-pts tabular">+${esc(formatNumber(g.points))}</span></li>`).join("")
     || `<li class="muted">–</li>`;
+}
+
+/**
+ * When the zoomed-in view shows none of the guesses, pin the five closest to
+ * the screen edge: an arrow in their direction, the name and the distance.
+ */
+function renderPointers(): void {
+  const box = $(".reveal-pointers");
+  box.innerHTML = "";
+  const m = revealMap;
+  if (!m || !pointerData || state?.phase !== "reveal" || !pointerData.closest.length) return;
+
+  const size = m.getSize();
+  const right = size.x - panelInset();
+  const onScreen = (p: L.Point) => p.x >= 16 && p.x <= right - 16 && p.y >= 16 && p.y <= size.y - 16;
+  const closest = pointerData.closest.map((g) => ({ ...g, pt: m.latLngToContainerPoint(g.ll) }));
+  if (closest.some((g) => onScreen(g.pt))) return;
+
+  // The box pointers are placed on; wide enough margins that a label never leaves the screen.
+  const mx = 150, my = 56;
+  const minX = mx, maxX = right - mx, minY = my, maxY = size.y - my - 80; // keep clear of the "→ continue" hint
+  const origin = m.latLngToContainerPoint(pointerData.answer);
+  const placed: { x: number; y: number; edge: "x" | "y" }[] = [];
+
+  closest.forEach((g, i) => {
+    const dx = g.pt.x - origin.x;
+    const dy = g.pt.y - origin.y;
+    // Walk from the answer towards the guess until the ray leaves the box.
+    const ts = [
+      dx > 0 ? (maxX - origin.x) / dx : dx < 0 ? (minX - origin.x) / dx : Infinity,
+      dy > 0 ? (maxY - origin.y) / dy : dy < 0 ? (minY - origin.y) / dy : Infinity,
+    ];
+    const t = Math.min(...ts);
+    const x0 = Math.min(maxX, Math.max(minX, origin.x + dx * t));
+    const y0 = Math.min(maxY, Math.max(minY, origin.y + dy * t));
+    const edge: "x" | "y" = ts[0] <= ts[1] ? "y" : "x"; // on a left/right edge we slide along y
+
+    // Slide along the edge (0, +1, -1, +2, -2 … steps) until it doesn't overlap an earlier pointer.
+    const overlaps = (x: number, y: number) => placed.some((p) => Math.abs(p.x - x) < 250 && Math.abs(p.y - y) < 52);
+    let x = x0, y = y0;
+    for (let k = 1; k <= 16 && overlaps(x, y); k++) {
+      const step = (k % 2 ? 1 : -1) * Math.ceil(k / 2);
+      x = edge === "x" ? Math.min(maxX, Math.max(minX, x0 + step * 260)) : x0;
+      y = edge === "y" ? Math.min(maxY, Math.max(minY, y0 + step * 56)) : y0;
+    }
+    placed.push({ x, y, edge });
+
+    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+    const el = document.createElement("div");
+    el.className = `pointer${i < 3 ? " top" : ""}`;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    el.style.animationDelay = `${i * 120}ms`;
+    el.innerHTML = `
+      <svg class="pointer-arrow" viewBox="0 0 24 24" style="transform: rotate(${angle}deg)" aria-hidden="true">
+        <path d="M4 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="pointer-rank">${i + 1}</span>
+      <span class="pointer-name">${esc(g.name)}</span>
+      <span class="pointer-dist tabular">${esc(formatDistance(g.distance_km))}</span>`;
+    box.append(el);
+  });
 }
 
 // -------------------------------------------------------------- standings
