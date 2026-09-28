@@ -397,7 +397,6 @@ body.idle .hint {
   display: flex;
   align-items: center;
   gap: 0.5em;
-  max-width: 280px;
   padding: 0.4em 0.9em 0.4em 0.5em;
   background: color-mix(in srgb, var(--card) 94%, transparent);
   border: 1px solid var(--line);
@@ -429,8 +428,6 @@ body.idle .hint {
 }
 .pointer-name {
   font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .pointer-dist {
   color: var(--ink-soft);

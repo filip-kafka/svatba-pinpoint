@@ -32,7 +32,7 @@ When the mouse is idle, the control bar hides itself. Move the mouse to bring it
 | City | 15 | 178 | 0 | 0 |
 
 The scale also sets how close the reveal zooms in on the answer: a regional view for World, street level for City.
-If none of the guesses is in view after zooming, arrows at the screen edge point to the five closest, with names and distances.
+Any of the five closest guesses that is outside the zoomed-in view gets an arrow at the screen edge pointing to it, with the name and distance.
 
 Points count toward the leaderboard only at the reveal, so nobody can tell how close they were before the answer is shown.
 

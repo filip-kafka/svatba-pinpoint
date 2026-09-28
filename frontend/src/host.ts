@@ -261,9 +261,15 @@ function renderReveal(s: HostState): void {
     || `<li class="muted">–</li>`;
 }
 
+const POINTER_MAX_WIDTH = 320; // px; long names shrink the label's font instead of being cut off
+const POINTER_NAME_MAX = 20;   // characters; the server caps names at 20 too
+
+const shortName = (name: string): string =>
+  [...name].length > POINTER_NAME_MAX ? `${[...name].slice(0, POINTER_NAME_MAX - 1).join("").trimEnd()}…` : name;
+
 /**
- * When the zoomed-in view shows none of the guesses, pin the five closest to
- * the screen edge: an arrow in their direction, the name and the distance.
+ * Any of the five closest guesses that is outside the zoomed-in view gets a
+ * pointer at the screen edge: an arrow in its direction, rank, name and distance.
  */
 function renderPointers(): void {
   const box = $(".reveal-pointers");
@@ -274,18 +280,44 @@ function renderPointers(): void {
   const size = m.getSize();
   const right = size.x - panelInset();
   const onScreen = (p: L.Point) => p.x >= 16 && p.x <= right - 16 && p.y >= 16 && p.y <= size.y - 16;
-  const closest = pointerData.closest.map((g) => ({ ...g, pt: m.latLngToContainerPoint(g.ll) }));
-  if (closest.some((g) => onScreen(g.pt))) return;
+  const offScreen = pointerData.closest
+    .map((g, i) => ({ ...g, rank: i + 1, pt: m.latLngToContainerPoint(g.ll) }))
+    .filter((g) => !onScreen(g.pt));
+  if (!offScreen.length) return;
 
-  // The box pointers are placed on; wide enough margins that a label never leaves the screen.
-  const mx = 150, my = 56;
+  // The box pointer centres are placed on; margins keep the widest label on screen.
+  const mx = POINTER_MAX_WIDTH / 2 + 12, my = 56;
   const minX = mx, maxX = right - mx, minY = my, maxY = size.y - my - 80; // keep clear of the "→ continue" hint
   const origin = m.latLngToContainerPoint(pointerData.answer);
-  const placed: { x: number; y: number; edge: "x" | "y" }[] = [];
+  const placed: { x: number; y: number; w: number; h: number }[] = [];
+  const GAP = 8;
 
-  closest.forEach((g, i) => {
+  offScreen.forEach((g, i) => {
     const dx = g.pt.x - origin.x;
     const dy = g.pt.y - origin.y;
+    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+
+    const el = document.createElement("div");
+    el.className = `pointer${g.rank <= 3 ? " top" : ""}`;
+    el.style.visibility = "hidden";
+    el.style.animationDelay = `${i * 120}ms`;
+    el.innerHTML = `
+      <svg class="pointer-arrow" viewBox="0 0 24 24" style="transform: rotate(${angle}deg)" aria-hidden="true">
+        <path d="M4 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="pointer-rank">${g.rank}</span>
+      <span class="pointer-name">${esc(shortName(g.name))}</span>
+      <span class="pointer-dist tabular">${esc(formatDistance(g.distance_km))}</span>`;
+    box.append(el);
+
+    // Shrink the font until the whole label fits the maximum width.
+    let fontPx = parseFloat(getComputedStyle(el).fontSize);
+    while (el.offsetWidth > POINTER_MAX_WIDTH && fontPx > 10) {
+      fontPx *= 0.93;
+      el.style.fontSize = `${fontPx}px`;
+    }
+    const w = el.offsetWidth, h = el.offsetHeight;
+
     // Walk from the answer towards the guess until the ray leaves the box.
     const ts = [
       dx > 0 ? (maxX - origin.x) / dx : dx < 0 ? (minX - origin.x) / dx : Infinity,
@@ -294,32 +326,22 @@ function renderPointers(): void {
     const t = Math.min(...ts);
     const x0 = Math.min(maxX, Math.max(minX, origin.x + dx * t));
     const y0 = Math.min(maxY, Math.max(minY, origin.y + dy * t));
-    const edge: "x" | "y" = ts[0] <= ts[1] ? "y" : "x"; // on a left/right edge we slide along y
+    const slideY = ts[0] <= ts[1]; // on a left/right edge we slide vertically
 
-    // Slide along the edge (0, +1, -1, +2, -2 … steps) until it doesn't overlap an earlier pointer.
-    const overlaps = (x: number, y: number) => placed.some((p) => Math.abs(p.x - x) < 250 && Math.abs(p.y - y) < 52);
+    // Slide along the edge (0, +1, -1, +2, -2 … steps) until it overlaps no earlier label.
+    const overlaps = (x: number, y: number) => placed.some((p) =>
+      Math.abs(p.x - x) < (p.w + w) / 2 + GAP && Math.abs(p.y - y) < (p.h + h) / 2 + GAP);
     let x = x0, y = y0;
-    for (let k = 1; k <= 16 && overlaps(x, y); k++) {
+    for (let k = 1; k <= 20 && overlaps(x, y); k++) {
       const step = (k % 2 ? 1 : -1) * Math.ceil(k / 2);
-      x = edge === "x" ? Math.min(maxX, Math.max(minX, x0 + step * 260)) : x0;
-      y = edge === "y" ? Math.min(maxY, Math.max(minY, y0 + step * 56)) : y0;
+      if (slideY) y = Math.min(maxY, Math.max(minY, y0 + step * (h + GAP)));
+      else x = Math.min(maxX, Math.max(minX, x0 + step * (w + GAP)));
     }
-    placed.push({ x, y, edge });
+    placed.push({ x, y, w, h });
 
-    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-    const el = document.createElement("div");
-    el.className = `pointer${i < 3 ? " top" : ""}`;
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
-    el.style.animationDelay = `${i * 120}ms`;
-    el.innerHTML = `
-      <svg class="pointer-arrow" viewBox="0 0 24 24" style="transform: rotate(${angle}deg)" aria-hidden="true">
-        <path d="M4 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="pointer-rank">${i + 1}</span>
-      <span class="pointer-name">${esc(g.name)}</span>
-      <span class="pointer-dist tabular">${esc(formatDistance(g.distance_km))}</span>`;
-    box.append(el);
+    el.style.visibility = "";
   });
 }
 
