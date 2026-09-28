@@ -129,6 +129,41 @@ export const answerIcon = L.divIcon({
   iconAnchor: [16, 43],
 });
 
+/**
+ * Guess dots are HTML markers, not L.circleMarker: vector shapes (circles,
+ * lines) get stretched along with the map during fly-to animations and can
+ * briefly fill the whole screen. Markers are re-positioned every frame at a
+ * constant size.
+ */
+const dotIcons = {
+  normal: L.divIcon({ className: "guess-dot", html: "<span></span>", iconSize: [14, 14], iconAnchor: [7, 7] }),
+  top: L.divIcon({ className: "guess-dot top", html: "<span></span>", iconSize: [20, 20], iconAnchor: [10, 10] }),
+};
+export const guessDotIcon = (top: boolean): L.DivIcon => (top ? dotIcons.top : dotIcons.normal);
+
+/**
+ * Fly to `target`, then run `whenLanded` - for lines, which must not exist
+ * during the flight for the same reason as above. Runs at most once, even if
+ * the animation is interrupted.
+ */
+export function flyThen(
+  map: L.Map,
+  fly: () => void,
+  whenLanded: () => void,
+  durationS: number,
+): void {
+  let done = false;
+  const land = () => {
+    if (done) return;
+    done = true;
+    map.off("moveend", land);
+    whenLanded();
+  };
+  map.on("moveend", land);
+  fly();
+  setTimeout(land, (durationS + 0.6) * 1000); // safety net if moveend never fires
+}
+
 /** Fold a longitude from a wrapped world copy back into [-180, 180). */
 export const wrapLng = (lng: number): number => ((((lng + 180) % 360) + 360) % 360) - 180;
 

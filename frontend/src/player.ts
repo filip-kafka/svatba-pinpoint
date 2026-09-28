@@ -8,7 +8,7 @@ import { $, esc, showView, toast } from "./shared/dom";
 import {
   errorText, formatDistance, formatNumber, lang, onLangChange, pick, t, toggleLang, type Key,
 } from "./shared/i18n";
-import { answerIcon, createMap, guessIcon, L, nearLng, START_VIEWS, warmUpMap, wrapLng, type MapStart } from "./shared/map";
+import { answerIcon, createMap, flyThen, guessIcon, L, nearLng, START_VIEWS, warmUpMap, wrapLng, type MapStart } from "./shared/map";
 import { LiveSocket, ServerClock } from "./shared/socket";
 import type { AnonymousState, PlayerState, ServerMessage } from "./shared/types";
 
@@ -260,8 +260,18 @@ function renderReveal(s: PlayerState): void {
     if (s.my_guess) {
       const g = L.latLng(s.my_guess.lat, nearLng(s.my_guess.lng, answer.lng));
       L.marker(g, { icon: guessIcon, keyboard: false }).addTo(layer);
-      L.polyline([g, answer], { color: "#2a2724", weight: 2, dashArray: "6 6", opacity: 0.7 }).addTo(layer);
-      m.flyToBounds(L.latLngBounds([g, answer]), { padding: [48, 48], maxZoom: 12, duration: 1.2 });
+      const round = s.round_index;
+      flyThen(
+        m,
+        () => m.flyToBounds(L.latLngBounds([g, answer]), { padding: [48, 48], maxZoom: 12, duration: 1.2 }),
+        () => {
+          if (revealedRound !== round || state?.phase !== "reveal") return;
+          L.polyline([g, answer], {
+            color: "#2a2724", weight: 2, dashArray: "6 6", opacity: 0.7, className: "reveal-line", interactive: false,
+          }).addTo(layer);
+        },
+        1.2,
+      );
     } else {
       m.flyTo(answer, 5, { duration: 1.2 });
     }

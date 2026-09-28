@@ -8,7 +8,7 @@ import QRCode from "qrcode";
 import { requireToken, forgetToken } from "./shared/auth";
 import { $, esc, showView, toast } from "./shared/dom";
 import { errorText, formatDistance, formatNumber, lang, onLangChange, pick, t, toggleLang } from "./shared/i18n";
-import { answerIcon, createMap, L, nearLng } from "./shared/map";
+import { answerIcon, createMap, flyThen, guessDotIcon, L, nearLng } from "./shared/map";
 import { LiveSocket, ServerClock } from "./shared/socket";
 import type { HostState, LeaderRow, ServerMessage } from "./shared/types";
 
@@ -180,6 +180,7 @@ function renderQuestion(s: HostState, fresh: boolean): void {
 // ------------------------------------------------------------------ reveal
 
 let revealMap: L.Map | null = null;
+let revealToken = 0;
 const revealLayer = L.layerGroup();
 
 function renderReveal(s: HostState): void {
@@ -196,29 +197,40 @@ function renderReveal(s: HostState): void {
   const guesses = s.guesses ?? [];
   const points: L.LatLng[] = [answer];
 
+  const lines: L.LatLng[] = [];
   guesses.forEach((g, i) => {
     const ll = L.latLng(g.lat, nearLng(g.lng, a.lng));
     points.push(ll);
-    L.polyline([ll, answer], { color: "#2a2724", weight: 1.5, opacity: 0.25, dashArray: "4 6" }).addTo(revealLayer);
-    const dot = L.circleMarker(ll, {
-      radius: i < 3 ? 9 : 6, color: "#fff", weight: 2, fillColor: i < 3 ? "#b8913e" : "#2f5d7c", fillOpacity: 0.95,
-    }).addTo(revealLayer);
+    lines.push(ll);
+    const dot = L.marker(ll, { icon: guessDotIcon(i < 3), keyboard: false, zIndexOffset: i < 3 ? 500 - i : 0 })
+      .addTo(revealLayer);
     if (i < 3) {
       // Spread the three labels so nearby guesses don't cover each other.
       const dir = (["top", "bottom", "right"] as const)[i];
-      const offset: L.PointTuple = [[0, -8], [0, 8], [8, 0]][i] as L.PointTuple;
+      const offset: L.PointTuple = [[0, -10], [0, 10], [10, 0]][i] as L.PointTuple;
       dot.bindTooltip(esc(g.name), { permanent: true, direction: dir, className: "guess-label", offset });
     }
   });
   L.marker(answer, { icon: answerIcon, zIndexOffset: 1000, keyboard: false }).addTo(revealLayer);
 
+  const drawLines = () => {
+    lines.forEach((ll) => L.polyline([ll, answer], {
+      color: "#2a2724", weight: 1.5, opacity: 0.25, dashArray: "4 6", className: "reveal-line", interactive: false,
+    }).addTo(revealLayer));
+  };
+
   m.setView([25, 10], 1.6, { animate: false });
+  const token = ++revealToken;
   setTimeout(() => {
-    if (points.length > 1) {
-      m.flyToBounds(L.latLngBounds(points), { padding: [70, 70], paddingBottomRight: [460, 70], maxZoom: 13, duration: 1.8 });
-    } else {
-      m.flyTo(answer, 6, { duration: 1.8 });
-    }
+    if (token !== revealToken) return; // a newer reveal (or language switch) took over
+    const duration = 1.8;
+    flyThen(m, () => {
+      if (points.length > 1) {
+        m.flyToBounds(L.latLngBounds(points), { padding: [70, 70], paddingBottomRight: [460, 70], maxZoom: 13, duration });
+      } else {
+        m.flyTo(answer, 6, { duration });
+      }
+    }, () => { if (token === revealToken) drawLines(); }, duration);
   }, 350);
 
   $<HTMLImageElement>(".reveal-thumb").src = s.photo ?? "";
