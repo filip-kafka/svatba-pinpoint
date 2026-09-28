@@ -61,6 +61,51 @@ cd backend && uv run pytest
 
 `npm run build` writes the production bundle to `backend/static/`, which FastAPI serves itself.
 
+## Testing on your laptop with real phones
+
+**1. Run the production container** (Docker Desktop or OrbStack on the Mac):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+```
+
+The organizer password is `local` unless `.env` sets another one.
+
+**2. Open everything through your Wi-Fi IP, not `localhost`.** The QR code on the projector screen encodes
+the address you opened `/host` with, and `localhost` means nothing to a phone.
+
+```bash
+ipconfig getifaddr en0          # e.g. 192.168.1.23
+```
+
+- `http://192.168.1.23:8000/admin` — upload a few photos
+- `http://192.168.1.23:8000/host` — the projector screen; press F for fullscreen
+- scan the QR code with phones on the **same Wi-Fi**
+
+If phones can't connect, macOS may be blocking incoming connections. Allow Docker in
+System Settings → Network → Firewall.
+
+**3. Add fake guests** to see how the screens handle a full room:
+
+```bash
+cd backend && uv run python scripts/fake_guests.py 80
+```
+
+**4. Testing several players from one computer:** every *normal* tab in the same browser is the same
+player, because the player ID is kept in the browser. Use private windows, or different browsers.
+
+**5. Testing on mobile data before the VPS is ready:** expose the laptop through a temporary HTTPS tunnel.
+
+```bash
+brew install cloudflared
+cloudflared tunnel --url http://localhost:8000     # prints https://<random>.trycloudflare.com
+```
+
+Open `/host` through that URL, so the QR code points at the tunnel.
+
+**To start again from scratch**, stop the stack and run `docker compose -f docker-compose.yml -f docker-compose.local.yml down -v`.
+This deletes the uploaded photos and the game state.
+
 ## Deploying to the VPS
 
 The Docker image builds the frontend and runs everything as one container. Game state is saved to the

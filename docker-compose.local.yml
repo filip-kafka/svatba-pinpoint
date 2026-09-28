@@ -1,0 +1,9 @@
+# Local testing on your laptop: publishes port 8000 on all interfaces so phones
+# on the same Wi-Fi can join. Don't use this on the VPS.
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+services:
+  pinpoint:
+    environment:
+      PINPOINT_ADMIN_TOKEN: ${PINPOINT_ADMIN_TOKEN:-local}
+    ports: !override
+      - "8000:8000"
