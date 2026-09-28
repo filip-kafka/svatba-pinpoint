@@ -145,10 +145,12 @@ The service must run with **one worker**, because the game lives in memory. The 
 
 - **Colours and fonts:** edit the variables at the top of `frontend/src/styles/base.css` (`--accent`, `--paper`, …).
 - **Texts, in both languages:** edit `frontend/src/shared/i18n.ts`.
-- **Map tiles:** set in `.env`, no rebuild needed. See `tile_config()` in `backend/app/config.py`.
-  - No key: OpenStreetMap's standard tiles.
-  - `PINPOINT_CARTO_KEY=…`: CARTO Voyager, a calmer map that looks better on a projector. The [key is free](https://carto.com/basemaps/apikey/) for non-commercial use, up to 5 million tiles a month. A wedding uses a few tens of thousands.
-  - `PINPOINT_TILES_URL=…` (+ `PINPOINT_TILES_ATTRIBUTION`): any other Leaflet tile URL.
+- **Map:** set in `.env`, no rebuild needed. See `tile_config()` in `backend/app/config.py`.
+  - Default: [OpenFreeMap](https://openfreemap.org) vector map ("liberty" style). It's free, needs no key and has no request limits. Vector tiles are small, so the map loads fast on phones and zooms smoothly. Phones without WebGL fall back to OpenStreetMap raster tiles automatically.
+  - `PINPOINT_MAP_STYLE=…`: another vector style, e.g. `https://tiles.openfreemap.org/styles/bright` or `…/positron`.
+  - `PINPOINT_CARTO_KEY=…`: CARTO Voyager raster tiles ([free key](https://carto.com/basemaps/apikey/)).
+  - `PINPOINT_TILES_URL=…` (+ `PINPOINT_TILES_ATTRIBUTION`): any other raster tile URL.
+- **Where the phone map opens:** admin → Game settings → "Phone map starts at" (Europe, Czechia or the whole world).
 - **Scoring:** `backend/app/scoring.py`.
 - **Time added by +15 s:** `EXTEND_SECONDS` in `backend/app/hub.py`.
 

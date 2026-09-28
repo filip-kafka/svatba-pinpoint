@@ -108,6 +108,7 @@ class Hub:
             "time_limit": g.time_limit(item) if item else None,
             "title": {"cs": settings.title_cs, "en": settings.title_en},
             "subtitle": {"cs": settings.subtitle_cs, "en": settings.subtitle_en},
+            "map_start": settings.map_start,
             "photo": photo_url(item.id) if show_photo and item else None,
             "player_count": len(g.players),
         }
@@ -197,6 +198,9 @@ class Hub:
             await ws.send_text(json.dumps(self.host_view(self.game.ranks())))
             while True:
                 msg = await ws.receive_json()
+                if msg.get("type") == "ping":  # keep-alive from LiveSocket, not an action
+                    await self._send(ws, json.dumps({"type": "pong"}))
+                    continue
                 async with self._lock:
                     error = self._host_action(msg)
                     if error:

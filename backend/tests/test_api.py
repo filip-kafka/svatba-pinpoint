@@ -168,9 +168,19 @@ def test_iphone_heic_with_rotation(client):
     assert not served.getexif()
 
 
-def test_map_config_defaults_to_keyless_osm(client):
+def test_map_config_defaults_to_openfreemap_vector(client):
     cfg = client.get("/api/map-config").json()
-    assert "tile.openstreetmap.org" in cfg["url"] and "OpenStreetMap" in cfg["attribution"]
+    assert cfg["kind"] == "vector" and cfg["style"].startswith("https://tiles.openfreemap.org/")
+    assert "OpenStreetMap" in cfg["attribution"]
+
+
+def test_map_start_setting_reaches_phones(client):
+    s = client.get("/api/admin/quiz", headers=AUTH).json()["settings"]
+    assert s["map_start"] == "europe"
+    s["map_start"] = "czechia"
+    assert client.put("/api/admin/settings", headers=AUTH, json=s).status_code == 200
+    with client.websocket_connect("/ws/player") as p:
+        assert p.receive_json()["map_start"] == "czechia"
 
 
 def test_map_config_uses_carto_key(tmp_path, monkeypatch):
@@ -179,5 +189,13 @@ def test_map_config_uses_carto_key(tmp_path, monkeypatch):
     monkeypatch.setenv("PINPOINT_CARTO_KEY", "abc123")
     with TestClient(create_app()) as c:
         cfg = c.get("/api/map-config").json()
+    assert cfg["kind"] == "raster"
     assert cfg["url"].startswith("https://basemaps.cartocdn.com/") and cfg["url"].endswith("?key=abc123")
     assert "CARTO" in cfg["attribution"]
+
+
+def test_host_keepalive_ping_is_not_an_action(client):
+    with client.websocket_connect(f"/ws/host?token={TOKEN}") as host:
+        host.receive_json()
+        host.send_json({"type": "ping"})
+        assert host.receive_json() == {"type": "pong"}

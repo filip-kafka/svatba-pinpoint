@@ -9,6 +9,7 @@ services:
     environment:
       PINPOINT_ADMIN_TOKEN: ${PINPOINT_ADMIN_TOKEN:?set PINPOINT_ADMIN_TOKEN in .env}
       PINPOINT_CARTO_KEY: ${PINPOINT_CARTO_KEY:-}
+      PINPOINT_MAP_STYLE: ${PINPOINT_MAP_STYLE:-}
     volumes:
       - pinpoint-data:/data
     ports:

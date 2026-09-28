@@ -8,7 +8,7 @@ import { $, esc, showView, toast } from "./shared/dom";
 import {
   errorText, formatDistance, formatNumber, lang, onLangChange, pick, t, toggleLang, type Key,
 } from "./shared/i18n";
-import { answerIcon, createMap, guessIcon, L, nearLng, wrapLng } from "./shared/map";
+import { answerIcon, createMap, guessIcon, L, nearLng, START_VIEWS, warmUpMap, wrapLng, type MapStart } from "./shared/map";
 import { LiveSocket, ServerClock } from "./shared/socket";
 import type { AnonymousState, PlayerState, ServerMessage } from "./shared/types";
 
@@ -58,9 +58,13 @@ nameInput.value = store.get(NAME_KEY) ?? "";
 let map: L.Map | null = null;
 const layer = L.layerGroup();
 
+function startView(): MapStart {
+  return state?.map_start ?? "europe";
+}
+
 function ensureMap(): L.Map {
   if (!map) {
-    map = createMap($("#map"), { zoomControl: false });
+    map = createMap($("#map"), { zoomControl: false }, startView());
     layer.addTo(map);
     map.on("click", (ev: L.LeafletMouseEvent) => placePin(ev.latlng));
   }
@@ -193,6 +197,7 @@ function render(): void {
       $(".lobby-hello").textContent = t("youreIn", { name: me.name });
       $(".lobby-count").textContent = t("joinedCount", { n: s.player_count });
       preparedRound = revealedRound = -1;
+      warmUpMap();
       celebrated = false;
       break;
     case "question":
@@ -218,7 +223,8 @@ function renderQuestion(s: PlayerState): void {
     preparedRound = s.round_index;
     layer.clearLayers();
     pendingMarker = null;
-    m.setView([30, 10], 1.5, { animate: false });
+    const view = START_VIEWS[startView()];
+    m.setView(view.center, view.zoom, { animate: false });
     photoImg.src = s.photo ?? "";
     lockBtn.disabled = true;
   }

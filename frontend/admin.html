@@ -29,6 +29,13 @@
           <label>Subtitle (CZ) <input name="subtitle_cs" maxlength="160" placeholder="e.g. Anna & Tomáš · 12. 6. 2027" /></label>
           <label>Subtitle (EN) <input name="subtitle_en" maxlength="160" /></label>
           <label>Seconds per photo <input name="default_time_limit" type="number" min="5" max="600" step="5" /></label>
+          <label>Phone map starts at
+            <select name="map_start">
+              <option value="europe">Europe</option>
+              <option value="world">Whole world</option>
+              <option value="czechia">Czechia</option>
+            </select>
+          </label>
           <div class="settings-actions"><button class="btn btn-primary" type="submit">Save settings</button></div>
         </form>
       </section>

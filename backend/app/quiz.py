@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from . import photos as photo_files
 
 Scale = Literal["world", "continent", "country", "city"]
+MapStart = Literal["world", "europe", "czechia"]
 
 
 class PhotoItem(BaseModel):
@@ -33,6 +34,7 @@ class QuizSettings(BaseModel):
     subtitle_cs: str = ""
     subtitle_en: str = ""
     default_time_limit: int = Field(default=40, ge=5, le=600)
+    map_start: MapStart = "europe"  # where the guessing map opens on phones
 
 
 class Quiz(BaseModel):

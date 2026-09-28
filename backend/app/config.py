@@ -19,33 +19,37 @@ class Settings:
 
 
 OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty"
 
 
 def tile_config() -> dict:
-    """Which map tiles the pages load. Precedence:
+    """Which map the pages load. First match wins:
 
-    1. PINPOINT_TILES_URL (+ PINPOINT_TILES_ATTRIBUTION): any Leaflet tile URL template.
-    2. PINPOINT_CARTO_KEY: CARTO Voyager (free key, 5M tiles/month for non-commercial use).
-    3. Nothing set: OpenStreetMap's own tiles, no key needed.
+    1. PINPOINT_TILES_URL (+ PINPOINT_TILES_ATTRIBUTION): any raster tile URL template.
+    2. PINPOINT_CARTO_KEY: CARTO Voyager raster tiles (free key).
+    3. PINPOINT_MAP_STYLE: a MapLibre vector style URL. Default: OpenFreeMap
+       "liberty" - free, no key, no request limits, and vector tiles are small,
+       so the map loads fast on phones and pinch-zooms smoothly.
     """
     custom = os.environ.get("PINPOINT_TILES_URL", "").strip()
     if custom:
         return {
+            "kind": "raster",
             "url": custom,
             "attribution": os.environ.get("PINPOINT_TILES_ATTRIBUTION", OSM_ATTRIBUTION),
-            "maxZoom": 19,
         }
     carto_key = os.environ.get("PINPOINT_CARTO_KEY", "").strip()
     if carto_key:
         return {
+            "kind": "raster",
             "url": "https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=" + carto_key,
             "attribution": OSM_ATTRIBUTION + ' &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            "maxZoom": 19,
         }
     return {
-        "url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "attribution": OSM_ATTRIBUTION,
-        "maxZoom": 19,
+        "kind": "vector",
+        "style": os.environ.get("PINPOINT_MAP_STYLE", "").strip() or OPENFREEMAP_STYLE,
+        "attribution": '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> '
+                       + OSM_ATTRIBUTION,
     }
 
 

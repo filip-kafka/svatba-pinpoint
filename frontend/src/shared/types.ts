@@ -22,6 +22,7 @@ interface CommonState {
   time_limit: number | null;
   title: Texts;
   subtitle: Texts;
+  map_start: "world" | "europe" | "czechia";
   photo: string | null;
   player_count: number;
 }
@@ -87,4 +88,5 @@ export interface QuizSettings {
   subtitle_cs: string;
   subtitle_en: string;
   default_time_limit: number;
+  map_start: "world" | "europe" | "czechia";
 }
