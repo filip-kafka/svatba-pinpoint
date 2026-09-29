@@ -59,6 +59,8 @@ const strings = {
     kick: "Odebrat",
     online: "online",
     offline: "offline",
+    mapPreloading: "Přednačítám mapu: {done} / {total}",
+    mapReady: "Mapa je připravená ✓",
     // admin/login
     adminToken: "Heslo organizátora",
     login: "Přihlásit",
@@ -133,6 +135,8 @@ const strings = {
     kick: "Remove",
     online: "online",
     offline: "offline",
+    mapPreloading: "Preloading the map: {done} / {total}",
+    mapReady: "Map ready ✓",
     adminToken: "Organizer password",
     login: "Log in",
     badToken: "Wrong password",

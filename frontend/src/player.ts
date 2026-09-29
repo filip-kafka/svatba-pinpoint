@@ -9,7 +9,11 @@ import {
   errorText, formatDistance, formatNumber, lang, onLangChange, pick, t, toggleLang, type Key,
 } from "./shared/i18n";
 import { loadAvatars, randomAvatar, renderAvatarGrid } from "./shared/avatars";
-import { answerIcon, avatarPinIcon, createMap, flyThen, L, nearLng, startViewOf, warmUpMap, wrapLng, type MapStart } from "./shared/map";
+import {
+  answerIcon, avatarPinIcon, createMap, flyThen, L, nearLng, preloadViews, startViewOf, wrapLng,
+  type MapStart, type View,
+} from "./shared/map";
+import { deeper } from "./shared/tilecache";
 import { LiveSocket, ServerClock } from "./shared/socket";
 import type { AnonymousState, PlayerState, ServerMessage } from "./shared/types";
 
@@ -83,11 +87,44 @@ function startView(): MapStart {
 function ensureMap(): L.Map {
   if (!map) {
     map = createMap($("#map"), { zoomControl: false }, startView());
+    L.control.zoom({ position: "bottomright", zoomInTitle: "+", zoomOutTitle: "−" }).addTo(map);
     layer.addTo(map);
     map.on("click", (ev: L.LeafletMouseEvent) => placePin(ev.latlng));
   }
   requestAnimationFrame(() => map!.invalidateSize());
   return map;
+}
+
+/** Map padding that keeps things out from under the photo thumbnail and the +/- buttons. */
+function thumbPadding(extra: number): { paddingTopLeft: L.PointTuple; paddingBottomRight: L.PointTuple } {
+  const thumbBottom = photoBtn.offsetTop + photoBtn.offsetHeight;
+  const zoomButtons = map?.getContainer().querySelector<HTMLElement>(".leaflet-control-zoom")?.offsetHeight ?? 92;
+  return { paddingTopLeft: [extra, thumbBottom + extra], paddingBottomRight: [extra, zoomButtons + extra + 10] };
+}
+
+/** In the lobby: pre-load the map the first round opens on (and one zoom level in). */
+function preloadStartView(): void {
+  const start = startView();
+  if (start === "photo") { // each round's hint area is pre-loaded when the round starts
+    void preloadViews([]);
+    return;
+  }
+  const v = startViewOf(start);
+  const view: View = {
+    lat: v.center[0], lng: v.center[1], zoom: v.zoom,
+    width: window.innerWidth, height: Math.max(300, window.innerHeight - 170), // minus the top and bottom bars
+  };
+  void preloadViews([view, deeper(view, 1)]);
+}
+
+/** Round start with a hint frame: pre-load the frame's area one and two zoom levels in. */
+function preloadHintArea(m: L.Map, bounds: [[number, number], [number, number]]): void {
+  const b = L.latLngBounds(bounds);
+  const nw = m.latLngToContainerPoint(b.getNorthWest());
+  const se = m.latLngToContainerPoint(b.getSouthEast());
+  const c = b.getCenter();
+  const frame: View = { lat: c.lat, lng: c.lng, zoom: m.getZoom(), width: se.x - nw.x, height: se.y - nw.y };
+  void preloadViews([deeper(frame, 1), deeper(frame, 2)], { urgent: true });
 }
 
 function canGuess(): boolean {
@@ -223,7 +260,7 @@ function render(): void {
       $(".lobby-avatar-emoji").textContent = me.avatar;
       $(".lobby-count").textContent = t("joinedCount", { n: s.player_count });
       preparedRound = revealedRound = -1;
-      warmUpMap();
+      preloadStartView();
       celebrated = false;
       break;
     case "question":
@@ -252,7 +289,8 @@ function renderQuestion(s: PlayerState): void {
     if (s.start_bounds) {
       // "Around the photo": open on the hint area and frame it.
       m.invalidateSize({ animate: false }); // the map was hidden between rounds
-      m.fitBounds(s.start_bounds, { animate: false, padding: [14, 14] });
+      m.fitBounds(s.start_bounds, { animate: false, ...thumbPadding(14) });
+      preloadHintArea(m, s.start_bounds);
       L.rectangle(s.start_bounds, {
         color: "#9c4a5a", weight: 2, dashArray: "6 5", fillColor: "#9c4a5a", fillOpacity: 0.05,
         interactive: false, className: "hint-area",
@@ -301,7 +339,7 @@ function renderReveal(s: PlayerState): void {
       const round = s.round_index;
       flyThen(
         m,
-        () => m.flyToBounds(L.latLngBounds([g, answer]), { padding: [48, 48], maxZoom: 12, duration: 1.2 }),
+        () => m.flyToBounds(L.latLngBounds([g, answer]), { ...thumbPadding(48), maxZoom: 12, duration: 1.2 }),
         () => {
           if (revealedRound !== round || state?.phase !== "reveal") return;
           L.polyline([g, answer], {
@@ -408,6 +446,7 @@ lockBtn.addEventListener("click", () => {
   }
 });
 
+photoBtn.setAttribute("aria-label", t("tapToZoom"));
 photoBtn.addEventListener("click", () => {
   if (!photoImg.src) return;
   $<HTMLImageElement>("img", lightbox).src = photoImg.src;

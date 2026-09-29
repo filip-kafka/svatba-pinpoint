@@ -9,9 +9,9 @@ import { requireToken, forgetToken } from "./shared/auth";
 import { $, esc, showView, toast } from "./shared/dom";
 import { errorText, formatDistance, formatNumber, lang, onLangChange, pick, t, toggleLang } from "./shared/i18n";
 import { avatarSpan } from "./shared/avatars";
-import { answerIcon, avatarDotIcon, createMap, flyThen, L, nearLng } from "./shared/map";
+import { answerIcon, avatarDotIcon, createMap, flyThen, L, mapTuning, nearLng, preloadViews, type View } from "./shared/map";
 import { LiveSocket, ServerClock } from "./shared/socket";
-import type { HostState, LeaderRow, Scale, ServerMessage } from "./shared/types";
+import type { HostState, LeaderRow, PhotoItem, Scale, ServerMessage } from "./shared/types";
 
 const stage = $(".stage");
 const dock = $(".dock");
@@ -28,6 +28,7 @@ let lastAdvance = 0;
 // ------------------------------------------------------------------- setup
 
 const token = await requireToken($(".login-root"));
+mapTuning.tileCacheZoomLevels = 10; // a laptop can keep plenty of parsed map tiles in memory
 stage.hidden = false;
 dock.hidden = false;
 
@@ -62,6 +63,10 @@ function handle(msg: ServerMessage): void {
   if (msg.type !== "state" || msg.role !== "host") return;
   clock.sync(msg.server_now);
   state = msg;
+  if (preloadedCount === -1) { // first message, whatever the phase (e.g. host page reloaded mid-game)
+    preloadedCount = msg.round_count;
+    void preloadReveals();
+  }
   render();
 }
 
@@ -116,6 +121,10 @@ function renderLobby(s: HostState): void {
   if (s.missing_location_count) warnings.push(t("photosMissing", { n: s.missing_location_count }));
   $(".lobby-warnings").innerHTML = warnings.map((w) => `<span>${esc(w)}</span>`).join("");
   $(".lobby-warnings").classList.toggle("bad", s.round_count === 0);
+  if (s.round_count !== preloadedCount) {
+    preloadedCount = s.round_count;
+    void preloadReveals();
+  }
 
   // Add new chips without rebuilding existing ones, so only newcomers animate in.
   const list = $(".chips");
@@ -161,12 +170,17 @@ function fitText(el: HTMLElement): void {
     el.style.fontSize = `${size}px`;
   }
 }
-window.addEventListener("resize", () => {
+function refitLobby(): void {
   if (state?.phase === "lobby") {
     fitChips();
     fitText($(".join-url"));
   }
-});
+}
+window.addEventListener("resize", refitLobby);
+// The display font arrives after the first render and is wider than the fallback,
+// so measure again once it's in - otherwise the join address can end up clipped.
+void document.fonts?.ready.then(refitLobby);
+document.fonts?.addEventListener?.("loadingdone", refitLobby);
 
 function renderQuestion(s: HostState, fresh: boolean): void {
   if (fresh) {
@@ -190,6 +204,56 @@ const revealLayer = L.layerGroup();
 
 /** How far the reveal zooms in, by the photo's scoring scale (admin → Scoring). */
 const REVEAL_ZOOM: Record<Scale, number> = { world: 7, continent: 8, country: 9, city: 13 };
+
+// ------------------------------------------------------------ map preload
+
+let preloadedCount = -1;
+let preloadKey = "";
+
+/**
+ * Download, in the background, every map view the reveals will show: the world
+ * view each reveal starts from, then for each photo (in game order) the landing
+ * view and the three zoom levels the flight passes through just before it.
+ * The host has the organizer token, so it can read the answers from the admin API.
+ */
+async function preloadReveals(): Promise<void> {
+  const r = await fetch("/api/admin/quiz", { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+  if (!r?.ok) return;
+  const photos = ((await r.json()) as { photos: PhotoItem[] }).photos
+    .filter((p): p is PhotoItem & { lat: number; lng: number } => p.lat != null && p.lng != null);
+  const key = photos.map((p) => `${p.id}:${p.lat}:${p.lng}:${p.scale}`).join("|");
+  if (!photos.length || key === preloadKey) return;
+  preloadKey = key;
+
+  // The answer sits beside the side panel, so cover a wider area than the screen.
+  const w = window.innerWidth * 1.3, h = window.innerHeight;
+  const views: View[] = [
+    { lat: 25, lng: 10, zoom: 1.6, width: window.innerWidth, height: h }, // where every reveal starts
+    { lat: 0, lng: 0, zoom: 2, width: 1024, height: 1024 },               // the whole world, two
+    { lat: 0, lng: 0, zoom: 3, width: 2048, height: 2048 },               // coarse levels deep
+  ];
+  for (const p of photos) {
+    const z = REVEAL_ZOOM[p.scale] ?? REVEAL_ZOOM.world;
+    // Landing view and the three levels just before it, all centred on the answer ...
+    for (let dz = 0; dz <= 3 && z - dz >= 3; dz++) views.push({ lat: p.lat, lng: p.lng, zoom: z - dz, width: w, height: h });
+    // ... and the middle of the flight, sampled along the way from the world view.
+    const lng = nearLng(p.lng, 10);
+    for (let k = 4; k <= z - 4; k++) {
+      for (const t of [0.6, 0.85]) {
+        views.push({ lat: 25 + (p.lat - 25) * t, lng: 10 + (lng - 10) * t, zoom: k, width: w, height: h });
+      }
+    }
+  }
+
+  const status = $(".map-status");
+  const show = (done: number, total: number) => {
+    status.hidden = false;
+    status.classList.toggle("done", done >= total);
+    status.textContent = done >= total ? t("mapReady") : t("mapPreloading", { done, total });
+  };
+  const vector = await preloadViews(views, { onProgress: show });
+  if (!vector) status.hidden = true; // raster maps aren't pre-loaded
+}
 
 /** What the edge pointers need: the answer and the five closest guesses (already sorted). */
 let pointerData: {

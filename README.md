@@ -140,11 +140,36 @@ proxy your domain to `127.0.0.1:8000` with **WebSocket support enabled**. If the
 
 The service must run with **one worker**, because the game lives in memory. The Dockerfile already does this.
 
+## Map pre-loading and caching
+
+A service worker (`frontend/public/sw.js`) keeps every map tile, font and sprite a device downloads, and
+serves it from the device after that. On top of that, the map is **pre-loaded** before it's needed:
+
+- **Host laptop, in the lobby:** it reads the answers through the admin API and downloads every view the
+  reveals will show: the world view each reveal starts from, the flight towards each answer and the landing
+  view. The lobby shows *Preloading the map: 120 / 480*, then **Map ready ✓**. In a test with 150 ms of
+  network latency, reveals then fetched **0** tiles from the network (70–90 without the cache).
+- **Phones, in the lobby:** the start view plus one zoom level in (about 20 tiles). With **Around each
+  photo**, the hint frame one and two zoom levels in is pre-loaded the moment a round starts.
+- MapLibre is tuned too: labels appear immediately instead of fading in, and the host keeps more zoom
+  levels of tiles in memory.
+
+The cache survives reloads and restarts. Opening `/host` on the projector laptop once at the venue (or
+the day before, in the same browser) is enough to have everything ready.
+
+Service workers need **HTTPS** (or `localhost`). On the VPS behind Caddy that's automatic. When you test on
+your laptop through `http://192.168.x.x:8000`, phones skip the service worker and only the browser's normal
+cache helps. Use the `cloudflared` tunnel from the testing section to try the real thing.
+
+Only vector maps (the default OpenFreeMap) are pre-loaded. OpenFreeMap has no usage limits. Raster tile
+servers such as tile.openstreetmap.org forbid bulk downloading, so the fallback maps are never pre-loaded.
+
 ## Before the wedding
 
 - [ ] Run a full rehearsal at home with 3–4 phones on **mobile data**, not your Wi-Fi.
 - [ ] Check the signal at the venue. If it's weak, ask for the guest Wi-Fi and put its password next to the QR code.
 - [ ] Open `/host` on the projector laptop the day before, so the password is saved in the browser.
+- [ ] At the venue, open `/host` early and wait for **Map ready ✓** in the lobby before guests join.
 - [ ] Press **F** for fullscreen. The QR code needs to be scannable from the back row, so test that too.
 - [ ] Budget about 30–40 s per photo. 10–15 photos make a good 15-minute game.
 - [ ] After the rehearsal, use **⋯ → New game (disconnect everyone)** so the test players are gone.
@@ -175,9 +200,13 @@ backend/app/
   scoring.py   haversine distance + points
   photos.py    upload: EXIF GPS → strip metadata → resize
   quiz.py      photos/settings stored in data/quiz.json
+  avatars.py   the avatar list
+  hints.py     the "around each photo" hint frames
 frontend/src/
   player.ts    phone page
   host.ts      projector page
   admin.ts     admin page
-  shared/      i18n, WebSocket with auto-reconnect, map helpers, types
+  shared/      i18n, WebSocket with auto-reconnect, map helpers, types,
+               tilecache.ts (map pre-loading)
+frontend/public/sw.js   service worker that keeps map data on the device
 ```

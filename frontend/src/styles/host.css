@@ -758,3 +758,14 @@ body.idle .dock {
 .b-name .av {
   font-size: 1.1em;
 }
+
+.map-status {
+  margin: 0.6vh 0 0;
+  font-size: clamp(12px, 1vw, 18px);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.map-status.done {
+  color: var(--ok);
+  font-weight: 600;
+}

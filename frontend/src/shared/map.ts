@@ -1,6 +1,7 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { esc } from "./dom";
+import { prefetchViews, setupMapCache, type View } from "./tilecache";
 
 type RasterConfig = { kind: "raster"; url: string; attribution: string };
 type TileConfig = RasterConfig | { kind: "vector"; style: string; attribution: string };
@@ -39,16 +40,35 @@ function loadVectorModules() {
 }
 
 /**
- * Fetch the map code and style while guests wait in the lobby, so the first
- * round's map appears instantly instead of loading while the timer runs.
+ * Fetch the map code, and start the tile cache, while guests wait in the lobby,
+ * so the first round's map appears instantly instead of loading on the clock.
+ * Resolves true when a vector (pre-loadable) map is in use.
  */
-export function warmUpMap(): void {
-  void loadTileConfig().then((cfg) => {
-    if (cfg.kind !== "vector" || !hasWebGL()) return;
-    void loadVectorModules();
-    void fetch(cfg.style).catch(() => undefined);
-  });
+export async function warmUpMap(): Promise<boolean> {
+  const cfg = await loadTileConfig();
+  if (cfg.kind !== "vector" || !hasWebGL()) return false;
+  void loadVectorModules();
+  setupMapCache(cfg.style);
+  return true;
 }
+
+/** Pre-load the map tiles for these views (no-op for raster maps). See tilecache.ts. */
+export async function preloadViews(
+  views: View[],
+  opts: Parameters<typeof prefetchViews>[1] = {},
+): Promise<boolean> {
+  if (!(await warmUpMap())) return false;
+  await prefetchViews(views, opts);
+  return true;
+}
+
+export type { View };
+
+/**
+ * MapLibre tuning. The host laptop keeps more zoom levels of parsed tiles in
+ * memory than a phone should.
+ */
+export const mapTuning = { tileCacheZoomLevels: 5 };
 
 function hasWebGL(): boolean {
   try {
@@ -63,7 +83,14 @@ async function baseLayer(cfg: TileConfig): Promise<L.Layer> {
   // Vector maps need WebGL; an old phone without it gets plain raster tiles instead.
   if (cfg.kind === "vector" && hasWebGL()) {
     const { maplibreGL } = await loadVectorModules();
-    return maplibreGL({ style: cfg.style, attributionControl: { customAttribution: cfg.attribution } });
+    setupMapCache(cfg.style);
+    return maplibreGL({
+      style: cfg.style,
+      attributionControl: { customAttribution: cfg.attribution },
+      fadeDuration: 0, // labels appear at once instead of fading in
+      cancelPendingTileRequestsWhileZooming: false, // keep loading coarser tiles while zooming in
+      maxTileCacheZoomLevels: mapTuning.tileCacheZoomLevels,
+    });
   }
   const raster = cfg.kind === "raster" ? cfg : OSM_FALLBACK;
   return L.tileLayer(raster.url, { attribution: raster.attribution, maxZoom: 19 });

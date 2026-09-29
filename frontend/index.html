@@ -61,12 +61,13 @@
 
         <!-- 3. Guessing + reveal (shares one map) -->
         <div data-view="play" class="play">
-          <button class="photo" type="button">
-            <img alt="" />
-            <span class="photo-zoom" data-t="tapToZoom"></span>
-          </button>
           <div class="map-wrap">
             <div id="map"></div>
+            <!-- The photo floats over the map as a thumbnail; tap to see it full screen. -->
+            <button class="photo" type="button">
+              <img alt="" />
+              <span class="photo-zoom" aria-hidden="true">⤢</span>
+            </button>
           </div>
           <div class="action">
             <div class="action-guess">
