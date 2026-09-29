@@ -109,6 +109,8 @@ class Hub:
             "title": {"cs": settings.title_cs, "en": settings.title_en},
             "subtitle": {"cs": settings.subtitle_cs, "en": settings.subtitle_en},
             "map_start": settings.map_start,
+            # the hint area only (never the answer itself), and only while guessing
+            "start_bounds": g.start_bounds.get(g.round_index) if g.phase == Phase.QUESTION else None,
             "photo": photo_url(item.id) if show_photo and item else None,
             "player_count": len(g.players),
         }
@@ -126,7 +128,7 @@ class Hub:
         g = self.game
         rp = g.round_points()
         return [
-            {"id": p.id, "name": p.name, "total": p.total, "rank": ranks[p.id],
+            {"id": p.id, "name": p.name, "avatar": p.avatar, "total": p.total, "rank": ranks[p.id],
              "prev_rank": g.prev_ranks.get(p.id), "round_points": rp.get(p.id)}
             for p in g.standings()
         ]
@@ -137,7 +139,7 @@ class Hub:
         view = self._common()
         view.update({
             "role": "host",
-            "players": [{"id": p.id, "name": p.name, "connected": p.id in connected}
+            "players": [{"id": p.id, "name": p.name, "avatar": p.avatar, "connected": p.id in connected}
                         for p in sorted(g.players.values(), key=lambda p: p.joined_at)],
             "connected_count": len(connected & g.players.keys()),
             "answered_count": len(g.guesses.get(g.round_index, {})),
@@ -149,7 +151,7 @@ class Hub:
         })
         if g.phase == Phase.REVEAL:
             view["guesses"] = sorted(
-                ({"name": g.players[pid].name, "lat": x.lat, "lng": x.lng,
+                ({"name": g.players[pid].name, "avatar": g.players[pid].avatar, "lat": x.lat, "lng": x.lng,
                   "distance_km": x.distance_km, "points": x.points}
                  for pid, x in g.guesses.get(g.round_index, {}).items() if pid in g.players),
                 key=lambda x: x["distance_km"],
@@ -166,7 +168,7 @@ class Hub:
         view.update({
             "role": "player",
             "me": None if player is None else {
-                "id": player.id, "name": player.name, "total": player.total,
+                "id": player.id, "name": player.name, "avatar": player.avatar, "total": player.total,
                 "rank": ranks.get(pid), "prev_rank": g.prev_ranks.get(pid),
             },
             "my_guess": None if guess is None else {"lat": guess.lat, "lng": guess.lng},
@@ -178,7 +180,7 @@ class Hub:
             view["result"] = None if guess is None else {
                 "distance_km": guess.distance_km, "points": guess.points}
         if g.phase == Phase.FINAL:
-            view["podium"] = [{"name": p.name, "total": p.total, "rank": ranks[p.id]}
+            view["podium"] = [{"name": p.name, "avatar": p.avatar, "total": p.total, "rank": ranks[p.id]}
                               for p in g.standings()[:3]]
         return view
 
@@ -267,6 +269,8 @@ class Hub:
                         pid = await self._player_join(ws, msg, pid)
                     elif kind == "guess" and pid is not None:
                         await self._player_guess(ws, pid, msg)
+                    elif kind == "avatar" and pid is not None:
+                        await self._player_avatar(ws, pid, msg)
                     elif kind == "ping":
                         await self._send(ws, json.dumps({"type": "pong"}))
         except (WebSocketDisconnect, RuntimeError, ValueError):
@@ -285,7 +289,7 @@ class Hub:
             await self._send(ws, json.dumps({"type": "error", "code": "full"}))
             return current
         try:
-            player = g.join(str(msg.get("name", "")), requested)
+            player = g.join(str(msg.get("name", "")), requested, msg.get("avatar"))
         except GameError as e:
             await self._send(ws, json.dumps({"type": "error", "code": e.code}))
             return current
@@ -293,11 +297,20 @@ class Hub:
             self.player_socks.get(current, set()).discard(ws)
         self.player_socks.setdefault(player.id, set()).add(ws)
         await self._send(ws, json.dumps({"type": "joined", "player_id": player.id,
-                                         "name": player.name}))
+                                         "name": player.name, "avatar": player.avatar}))
         if is_new:
             self.persist()
         await self.broadcast(only_players={player.id})
         return player.id
+
+    async def _player_avatar(self, ws: WebSocket, pid: str, msg: dict) -> None:
+        try:
+            self.game.set_avatar(pid, msg.get("avatar"))
+        except GameError as e:
+            await self._send(ws, json.dumps({"type": "error", "code": e.code}))
+            return
+        self.persist()
+        await self.broadcast(only_players={pid})  # hosts always get the update too
 
     async def _player_guess(self, ws: WebSocket, pid: str, msg: dict) -> None:
         g = self.game

@@ -1,5 +1,6 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { esc } from "./dom";
 
 type RasterConfig = { kind: "raster"; url: string; attribution: string };
 type TileConfig = RasterConfig | { kind: "vector"; style: string; attribution: string };
@@ -68,16 +69,21 @@ async function baseLayer(cfg: TileConfig): Promise<L.Layer> {
   return L.tileLayer(raster.url, { attribution: raster.attribution, maxZoom: 19 });
 }
 
-/** Where maps open. Chosen in the admin ("Phone map starts at"). */
-export type MapStart = "world" | "europe" | "czechia";
-export const START_VIEWS: Record<MapStart, { center: L.LatLngTuple; zoom: number }> = {
+/**
+ * Where maps open. Chosen in the admin ("Phone map starts at"). "photo" means
+ * the server sends a hint area per round; until then the world view is used.
+ */
+export type MapStart = "world" | "europe" | "czechia" | "photo";
+export const START_VIEWS: Record<Exclude<MapStart, "photo">, { center: L.LatLngTuple; zoom: number }> = {
   world: { center: [30, 10], zoom: 1.5 },
   europe: { center: [50, 12], zoom: 3.25 },
   czechia: { center: [49.8, 15.4], zoom: 6.25 },
 };
 
+export const startViewOf = (start: MapStart) => START_VIEWS[start === "photo" ? "world" : start];
+
 export function createMap(el: HTMLElement, opts: L.MapOptions = {}, start: MapStart = "world"): L.Map {
-  const view = START_VIEWS[start];
+  const view = startViewOf(start);
   const map = L.map(el, {
     worldCopyJump: true,
     minZoom: 1,
@@ -130,16 +136,30 @@ export const answerIcon = L.divIcon({
 });
 
 /**
- * Guess dots are HTML markers, not L.circleMarker: vector shapes (circles,
- * lines) get stretched along with the map during fly-to animations and can
- * briefly fill the whole screen. Markers are re-positioned every frame at a
- * constant size.
+ * A player's guess on the reveal map: their avatar in a circle, centred on the
+ * guessed spot. HTML markers rather than L.circleMarker, because vector shapes
+ * get stretched along with the map during fly-to animations; markers are
+ * re-positioned every frame at a constant size.
  */
-const dotIcons = {
-  normal: L.divIcon({ className: "guess-dot", html: "<span></span>", iconSize: [14, 14], iconAnchor: [7, 7] }),
-  top: L.divIcon({ className: "guess-dot top", html: "<span></span>", iconSize: [20, 20], iconAnchor: [10, 10] }),
-};
-export const guessDotIcon = (top: boolean): L.DivIcon => (top ? dotIcons.top : dotIcons.normal);
+export function avatarDotIcon(avatar: string, top: boolean): L.DivIcon {
+  const size = top ? 42 : 32;
+  return L.divIcon({
+    className: `guess-dot${top ? " top" : ""}`,
+    html: `<span>${esc(avatar)}</span>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
+/** The phone's own guess: the avatar in a bubble whose tail marks the exact spot. */
+export function avatarPinIcon(avatar: string): L.DivIcon {
+  return L.divIcon({
+    className: "pin avatar-pin",
+    html: `<span>${esc(avatar)}</span>`,
+    iconSize: [44, 54],
+    iconAnchor: [22, 53],
+  });
+}
 
 /**
  * Fly to `target`, then run `whenLanded` - for lines, which must not exist

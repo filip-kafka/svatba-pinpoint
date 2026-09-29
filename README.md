@@ -42,6 +42,11 @@ Points count toward the leaderboard only at the reveal, so nobody can tell how c
 2. If a photo has GPS in its metadata, the location is filled in automatically. Photos shared through WhatsApp, Messenger or social media have usually lost it. For those, click the photo and search for a place, click the map, or paste coordinates (in Google Maps, right-click a place and click the numbers to copy them).
 3. Optionally add a caption for each photo. It appears when the answer is revealed, e.g. *"Our first holiday – Crete"*.
 4. Reorder the photos with ↑ ↓. Photos without a location are skipped automatically.
+5. Choose where the phones' map opens (Game settings → "Phone map starts at"). **Around each photo** gives
+   guests a hint: each round's map opens on a dashed frame that contains the answer at a random spot (never
+   the centre), so the game becomes reading the landscape rather than guessing the continent. The frame's
+   size follows the photo's Scoring: World ≈ 4000 km, Continent ≈ 1600 km, Country ≈ 500 km, City ≈ 60 km
+   (`HINT_SIZE_KM` in `backend/app/hints.py`). Guests can still zoom out.
 
 Photos are resized to 2048 px and **all metadata is stripped** before guests see them. Otherwise, anyone could save the image and read the GPS answer from it.
 
@@ -153,7 +158,10 @@ The service must run with **one worker**, because the game lives in memory. The 
   - `PINPOINT_MAP_STYLE=…`: another vector style, e.g. `https://tiles.openfreemap.org/styles/bright` or `…/positron`.
   - `PINPOINT_CARTO_KEY=…`: CARTO Voyager raster tiles ([free key](https://carto.com/basemaps/apikey/)).
   - `PINPOINT_TILES_URL=…` (+ `PINPOINT_TILES_ATTRIBUTION`): any other raster tile URL.
-- **Where the phone map opens:** admin → Game settings → "Phone map starts at" (Europe, Czechia or the whole world).
+- **Where the phone map opens:** admin → Game settings → "Phone map starts at" (Europe, Czechia, the whole world, or a hint area around each photo).
+- **Avatars:** guests pick one when joining and can change it in the lobby by tapping it. They appear on the
+  reveal map, in the lobby, the leaderboard and on the podium. The list is in `backend/app/avatars.py`; they're
+  emoji, so there are no image files, and the phones load the list from the server.
 - **Scoring:** `backend/app/scoring.py`.
 - **Time added by +15 s:** `EXTEND_SECONDS` in `backend/app/hub.py`.
 

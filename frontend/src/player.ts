@@ -8,12 +8,14 @@ import { $, esc, showView, toast } from "./shared/dom";
 import {
   errorText, formatDistance, formatNumber, lang, onLangChange, pick, t, toggleLang, type Key,
 } from "./shared/i18n";
-import { answerIcon, createMap, flyThen, guessIcon, L, nearLng, START_VIEWS, warmUpMap, wrapLng, type MapStart } from "./shared/map";
+import { loadAvatars, randomAvatar, renderAvatarGrid } from "./shared/avatars";
+import { answerIcon, avatarPinIcon, createMap, flyThen, L, nearLng, startViewOf, warmUpMap, wrapLng, type MapStart } from "./shared/map";
 import { LiveSocket, ServerClock } from "./shared/socket";
 import type { AnonymousState, PlayerState, ServerMessage } from "./shared/types";
 
 const ID_KEY = "pinpoint.player";
 const NAME_KEY = "pinpoint.name";
+const AVATAR_KEY = "pinpoint.avatar";
 
 const store = {
   get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -37,6 +39,7 @@ const photoBtn = $<HTMLButtonElement>(".photo");
 const photoImg = $<HTMLImageElement>(".photo img");
 const lightbox = $(".lightbox");
 const action = $(".action");
+const sheet = $(".avatar-sheet");
 
 // --------------------------------------------------------------------- state
 
@@ -48,10 +51,25 @@ let preparedRound = -1;
 let revealedRound = -1;
 let pendingMarker: L.Marker | null = null;
 let celebrated = false;
+let chosenAvatar: string | null = store.get(AVATAR_KEY); // picked on the join screen
+let avatarList: string[] = [];
 
 const clock = new ServerClock();
 
 nameInput.value = store.get(NAME_KEY) ?? "";
+
+/** The avatar to draw for this player: the server's copy once joined. */
+const myAvatar = (): string =>
+  (state?.role === "player" && state.me?.avatar) || chosenAvatar || "🙂";
+
+void loadAvatars().then((avatars) => {
+  avatarList = avatars;
+  if (!chosenAvatar || !avatars.includes(chosenAvatar)) chosenAvatar = randomAvatar(avatars);
+  renderAvatarGrid($(".join-avatars"), avatars, chosenAvatar, (a) => {
+    chosenAvatar = a;
+    store.set(AVATAR_KEY, a);
+  });
+});
 
 // ----------------------------------------------------------------------- map
 
@@ -80,7 +98,7 @@ function canGuess(): boolean {
 function placePin(latlng: L.LatLng): void {
   if (!canGuess()) return;
   if (!pendingMarker) {
-    pendingMarker = L.marker(latlng, { icon: guessIcon, draggable: true, keyboard: false }).addTo(layer);
+    pendingMarker = L.marker(latlng, { icon: avatarPinIcon(myAvatar()), draggable: true, keyboard: false }).addTo(layer);
   } else {
     pendingMarker.setLatLng(latlng);
   }
@@ -91,7 +109,9 @@ function placePin(latlng: L.LatLng): void {
 
 const socket = new LiveSocket("/ws/player", {
   onOpen: () => {
-    if (playerId) socket.send({ type: "join", player_id: playerId, name: store.get(NAME_KEY) ?? "" });
+    if (playerId) {
+      socket.send({ type: "join", player_id: playerId, name: store.get(NAME_KEY) ?? "", avatar: chosenAvatar });
+    }
   },
   onStatus: (s) => {
     $(".connection-lost").hidden = s === "open" || (s === "connecting" && state === null);
@@ -112,6 +132,8 @@ function handle(msg: ServerMessage): void {
       playerId = msg.player_id;
       store.set(ID_KEY, msg.player_id);
       store.set(NAME_KEY, msg.name);
+      store.set(AVATAR_KEY, msg.avatar);
+      chosenAvatar = msg.avatar;
       goneReason = null;
       break;
     case "error":
@@ -186,15 +208,19 @@ function render(): void {
   const s = state;
   const me = s.me!;
   $(".me").hidden = false;
+  $(".me-avatar").textContent = me.avatar;
   $(".me-name").textContent = me.name;
   $(".me-points").textContent = t("points", { n: formatNumber(me.total) });
   $(".round-label").textContent = s.round_index >= 0 && s.phase !== "final"
     ? t("round", { i: s.round_index + 1, n: s.round_count }) : "";
 
+  if (s.phase !== "lobby") sheet.hidden = true;
+
   switch (s.phase) {
     case "lobby":
       showView(views, "lobby");
       $(".lobby-hello").textContent = t("youreIn", { name: me.name });
+      $(".lobby-avatar-emoji").textContent = me.avatar;
       $(".lobby-count").textContent = t("joinedCount", { n: s.player_count });
       preparedRound = revealedRound = -1;
       warmUpMap();
@@ -223,17 +249,29 @@ function renderQuestion(s: PlayerState): void {
     preparedRound = s.round_index;
     layer.clearLayers();
     pendingMarker = null;
-    const view = START_VIEWS[startView()];
-    m.setView(view.center, view.zoom, { animate: false });
+    if (s.start_bounds) {
+      // "Around the photo": open on the hint area and frame it.
+      m.invalidateSize({ animate: false }); // the map was hidden between rounds
+      m.fitBounds(s.start_bounds, { animate: false, padding: [14, 14] });
+      L.rectangle(s.start_bounds, {
+        color: "#9c4a5a", weight: 2, dashArray: "6 5", fillColor: "#9c4a5a", fillOpacity: 0.05,
+        interactive: false, className: "hint-area",
+      }).addTo(layer);
+    } else {
+      const view = startViewOf(startView());
+      m.setView(view.center, view.zoom, { animate: false });
+    }
     photoImg.src = s.photo ?? "";
     lockBtn.disabled = true;
   }
+  $(".hint").textContent = s.start_bounds ? t("tapMapHint") : t("tapMap");
 
   if (s.my_guess) {
-    // Server confirmed our guess: pin it in place.
-    layer.clearLayers();
+    // Server confirmed our guess: pin it in place (the hint frame stays).
+    pendingMarker?.remove();
     pendingMarker = null;
-    L.marker([s.my_guess.lat, s.my_guess.lng], { icon: guessIcon, keyboard: false }).addTo(layer);
+    layer.eachLayer((l) => { if (l instanceof L.Marker) layer.removeLayer(l); });
+    L.marker([s.my_guess.lat, s.my_guess.lng], { icon: avatarPinIcon(myAvatar()), keyboard: false }).addTo(layer);
     setAction("status", t("guessLocked"), t("waitingOthers"));
   } else if (s.closed) {
     pendingMarker?.dragging?.disable();
@@ -259,7 +297,7 @@ function renderReveal(s: PlayerState): void {
     L.marker(answer, { icon: answerIcon, keyboard: false, zIndexOffset: 1000 }).addTo(layer);
     if (s.my_guess) {
       const g = L.latLng(s.my_guess.lat, nearLng(s.my_guess.lng, answer.lng));
-      L.marker(g, { icon: guessIcon, keyboard: false }).addTo(layer);
+      L.marker(g, { icon: avatarPinIcon(myAvatar()), keyboard: false }).addTo(layer);
       const round = s.round_index;
       flyThen(
         m,
@@ -295,6 +333,7 @@ function renderStanding(s: PlayerState): void {
   const me = s.me!;
   const final = s.phase === "final";
   $(".standing-kicker").textContent = final ? t("finalTitle") : t("leaderboard");
+  $(".standing-avatar").textContent = me.avatar;
   $(".rank").textContent = me.rank ? `#${me.rank}` : "–";
   $(".standing-total").textContent = `${t("totalPoints", { n: formatNumber(me.total) })} · ${t("yourRank", {
     rank: me.rank ?? "–", n: s.player_count,
@@ -310,6 +349,7 @@ function renderStanding(s: PlayerState): void {
   if (final && s.podium) {
     podium.innerHTML = s.podium.map((p) => `
       <li class="podium-${p.rank}"><span class="medal">${["🥇", "🥈", "🥉"][p.rank - 1] ?? p.rank}</span>
+        <span class="podium-avatar" aria-hidden="true">${esc(p.avatar)}</span>
         <span class="podium-name">${esc(p.name)}</span>
         <span class="podium-total tabular">${esc(formatNumber(p.total))}</span></li>`).join("");
     if (!celebrated && me.rank && me.rank <= 3) {
@@ -350,7 +390,7 @@ joinForm.addEventListener("submit", (ev) => {
   joining = true;
   renderJoinButton();
   store.set(NAME_KEY, name);
-  if (!socket.send({ type: "join", name, player_id: playerId })) {
+  if (!socket.send({ type: "join", name, player_id: playerId, avatar: chosenAvatar })) {
     joining = false;
     renderJoinButton();
     toast(t("reconnecting"), "error");
@@ -380,6 +420,18 @@ $(".rejoin-btn").addEventListener("click", () => {
   render();
   nameInput.focus();
 });
+
+// Changing the avatar after joining (lobby only - it's the moment people fiddle).
+$(".lobby-avatar").addEventListener("click", () => {
+  renderAvatarGrid($(".sheet-avatars"), avatarList, myAvatar(), (a) => {
+    chosenAvatar = a;
+    store.set(AVATAR_KEY, a);
+    socket.send({ type: "avatar", avatar: a });
+  });
+  sheet.hidden = false;
+});
+$(".sheet-done").addEventListener("click", () => { sheet.hidden = true; });
+sheet.addEventListener("click", (ev) => { if (ev.target === sheet) sheet.hidden = true; });
 
 $(".lang-toggle").addEventListener("click", toggleLang);
 onLangChange(render);

@@ -8,7 +8,8 @@ import QRCode from "qrcode";
 import { requireToken, forgetToken } from "./shared/auth";
 import { $, esc, showView, toast } from "./shared/dom";
 import { errorText, formatDistance, formatNumber, lang, onLangChange, pick, t, toggleLang } from "./shared/i18n";
-import { answerIcon, createMap, flyThen, guessDotIcon, L, nearLng } from "./shared/map";
+import { avatarSpan } from "./shared/avatars";
+import { answerIcon, avatarDotIcon, createMap, flyThen, L, nearLng } from "./shared/map";
 import { LiveSocket, ServerClock } from "./shared/socket";
 import type { HostState, LeaderRow, Scale, ServerMessage } from "./shared/types";
 
@@ -127,8 +128,11 @@ function renderLobby(s: HostState): void {
     if (!li) {
       li = document.createElement("li");
       li.dataset.id = p.id;
-      li.textContent = p.name;
       list.append(li);
+    }
+    if (li.dataset.avatar !== p.avatar) { // new chip, or the guest picked another avatar
+      li.dataset.avatar = p.avatar;
+      li.innerHTML = `${avatarSpan(p.avatar)}${esc(p.name)}`;
     }
     li.classList.toggle("offline", !p.connected);
   }
@@ -188,7 +192,10 @@ const revealLayer = L.layerGroup();
 const REVEAL_ZOOM: Record<Scale, number> = { world: 7, continent: 8, country: 9, city: 13 };
 
 /** What the edge pointers need: the answer and the five closest guesses (already sorted). */
-let pointerData: { answer: L.LatLng; closest: { name: string; ll: L.LatLng; distance_km: number }[] } | null = null;
+let pointerData: {
+  answer: L.LatLng;
+  closest: { name: string; avatar: string; ll: L.LatLng; distance_km: number }[];
+} | null = null;
 
 /** Width of map hidden under the side panel, so "on screen" means actually visible. */
 function panelInset(): number {
@@ -215,12 +222,12 @@ function renderReveal(s: HostState): void {
   pointerData = { answer, closest: guesses.slice(0, 5) };
 
   guesses.forEach((g, i) => {
-    const dot = L.marker(g.ll, { icon: guessDotIcon(i < 3), keyboard: false, zIndexOffset: i < 3 ? 500 - i : 0 })
+    const dot = L.marker(g.ll, { icon: avatarDotIcon(g.avatar, i < 3), keyboard: false, zIndexOffset: i < 3 ? 500 - i : 0 })
       .addTo(revealLayer);
     if (i < 3) {
       // Spread the three labels so nearby guesses don't cover each other.
       const dir = (["top", "bottom", "right"] as const)[i];
-      const offset: L.PointTuple = [[0, -10], [0, 10], [10, 0]][i] as L.PointTuple;
+      const offset: L.PointTuple = [[0, -24], [0, 24], [24, 0]][i] as L.PointTuple;
       dot.bindTooltip(esc(g.name), { permanent: true, direction: dir, className: "guess-label", offset });
     }
   });
@@ -255,7 +262,7 @@ function renderReveal(s: HostState): void {
   $(".reveal-caption").hidden = !caption;
   $(".reveal-closest-label").textContent = t("closest");
   $(".closest").innerHTML = guesses.slice(0, 5).map((g) => `
-    <li><span class="c-name">${esc(g.name)}</span>
+    <li><span class="c-name">${avatarSpan(g.avatar)}${esc(g.name)}</span>
       <span class="c-dist muted tabular">${esc(formatDistance(g.distance_km))}</span>
       <span class="c-pts tabular">+${esc(formatNumber(g.points))}</span></li>`).join("")
     || `<li class="muted">–</li>`;
@@ -292,6 +299,20 @@ function renderPointers(): void {
   const placed: { x: number; y: number; w: number; h: number }[] = [];
   const GAP = 8;
 
+  // Things already on the map that a pointer must not cover: the answer pin and the
+  // visible top-3 avatars with their name labels.
+  const mapRect = $("#reveal-map").getBoundingClientRect();
+  document.querySelectorAll<HTMLElement>(
+    "#reveal-map .pin-answer, #reveal-map .guess-dot.top, #reveal-map .leaflet-tooltip.guess-label",
+  ).forEach((el) => {
+    const r = el.getBoundingClientRect();
+    const visible = r.width > 0 && r.right > mapRect.left && r.left < mapRect.right
+      && r.bottom > mapRect.top && r.top < mapRect.bottom;
+    if (visible) {
+      placed.push({ x: r.left - mapRect.left + r.width / 2, y: r.top - mapRect.top + r.height / 2, w: r.width, h: r.height });
+    }
+  });
+
   offScreen.forEach((g, i) => {
     const dx = g.pt.x - origin.x;
     const dy = g.pt.y - origin.y;
@@ -306,6 +327,7 @@ function renderPointers(): void {
         <path d="M4 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <span class="pointer-rank">${g.rank}</span>
+      ${avatarSpan(g.avatar, "pointer-avatar")}
       <span class="pointer-name">${esc(shortName(g.name))}</span>
       <span class="pointer-dist tabular">${esc(formatDistance(g.distance_km))}</span>`;
     box.append(el);
@@ -364,7 +386,7 @@ function renderBoard(s: HostState, fresh: boolean): void {
     <li style="--i:${rows.length - i}; --w:${(r.total / max) * 100}%">
       <span class="b-rank tabular">${r.rank}</span>
       ${changeBadge(r)}
-      <span class="b-name">${esc(r.name)}</span>
+      <span class="b-name">${avatarSpan(r.avatar)}${esc(r.name)}</span>
       <span class="b-round tabular">${r.round_points ? `+${esc(formatNumber(r.round_points))}` : ""}</span>
       <span class="b-total tabular">${esc(formatNumber(r.total))}</span>
     </li>`).join("");
@@ -378,12 +400,13 @@ function renderFinal(s: HostState, fresh: boolean): void {
   const order = [top[1], top[0], top[2]].filter(Boolean) as LeaderRow[];
   $(".podium").innerHTML = order.map((r) => `
     <div class="step step-${r.rank <= 3 ? r.rank : 3}">
+      ${avatarSpan(r.avatar, "step-avatar")}
       <div class="step-name display">${esc(r.name)}</div>
       <div class="step-points tabular">${esc(formatNumber(r.total))}</div>
       <div class="step-block display">${r.rank}</div>
     </div>`).join("");
   $(".final-rest").innerHTML = rows.slice(3, 10).map((r) => `
-    <li><span class="tabular">${r.rank}.</span> ${esc(r.name)} <span class="muted tabular">${esc(formatNumber(r.total))}</span></li>`).join("");
+    <li><span class="tabular">${r.rank}.</span> ${avatarSpan(r.avatar)}${esc(r.name)} <span class="muted tabular">${esc(formatNumber(r.total))}</span></li>`).join("");
 
   const colors = ["#9c4a5a", "#b8913e", "#f4e3e5", "#2f5d7c", "#ffffff"];
   const burst = (x: number) => confetti({ particleCount: 90, spread: 70, origin: { x, y: 0.6 }, colors });
@@ -425,7 +448,7 @@ function renderDrawer(s: HostState): void {
   $(".drawer-title").textContent = `${t("players")} (${s.players.length})`;
   $(".drawer-list").innerHTML = s.players.map((p) => `
     <li><span class="dot ${p.connected ? "on" : ""}" title="${esc(p.connected ? t("online") : t("offline"))}"></span>
-      <span class="d-name">${esc(p.name)}</span>
+      <span class="d-name">${avatarSpan(p.avatar)}${esc(p.name)}</span>
       <button class="btn btn-small btn-danger" data-kick="${esc(p.id)}" data-name="${esc(p.name)}">${esc(t("kick"))}</button></li>`).join("");
 }
 

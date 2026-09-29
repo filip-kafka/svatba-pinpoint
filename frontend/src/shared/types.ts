@@ -3,6 +3,7 @@
 export type Phase = "lobby" | "question" | "reveal" | "leaderboard" | "final";
 export type Texts = { cs: string; en: string };
 export type Scale = "world" | "continent" | "country" | "city";
+export type MapStart = "world" | "europe" | "czechia" | "photo";
 
 export interface Answer {
   lat: number;
@@ -22,7 +23,9 @@ interface CommonState {
   time_limit: number | null;
   title: Texts;
   subtitle: Texts;
-  map_start: "world" | "europe" | "czechia";
+  map_start: MapStart;
+  /** Hint area [[south, west], [north, east]] when map_start is "photo"; only while guessing. */
+  start_bounds: [[number, number], [number, number]] | null;
   photo: string | null;
   player_count: number;
 }
@@ -30,6 +33,7 @@ interface CommonState {
 export interface LeaderRow {
   id: string;
   name: string;
+  avatar: string;
   total: number;
   rank: number;
   prev_rank: number | null;
@@ -38,23 +42,23 @@ export interface LeaderRow {
 
 export interface HostState extends CommonState {
   role: "host";
-  players: { id: string; name: string; connected: boolean }[];
+  players: { id: string; name: string; avatar: string; connected: boolean }[];
   connected_count: number;
   answered_count: number;
   is_last_round: boolean;
   missing_location_count: number;
   answer: Answer | null;
-  guesses: { name: string; lat: number; lng: number; distance_km: number; points: number }[] | null;
+  guesses: { name: string; avatar: string; lat: number; lng: number; distance_km: number; points: number }[] | null;
   leaderboard: LeaderRow[] | null;
 }
 
 export interface PlayerState extends CommonState {
   role: "player";
-  me: { id: string; name: string; total: number; rank: number | null; prev_rank: number | null } | null;
+  me: { id: string; name: string; avatar: string; total: number; rank: number | null; prev_rank: number | null } | null;
   my_guess: { lat: number; lng: number } | null;
   answer: Answer | null;
   result: { distance_km: number; points: number } | null;
-  podium: { name: string; total: number; rank: number }[] | null;
+  podium: { name: string; avatar: string; total: number; rank: number }[] | null;
 }
 
 export interface AnonymousState extends CommonState {
@@ -65,7 +69,7 @@ export type ServerMessage =
   | HostState
   | PlayerState
   | AnonymousState
-  | { type: "joined"; player_id: string; name: string }
+  | { type: "joined"; player_id: string; name: string; avatar: string }
   | { type: "error"; code: string }
   | { type: "kicked" }
   | { type: "reset" }
@@ -88,5 +92,5 @@ export interface QuizSettings {
   subtitle_cs: string;
   subtitle_en: string;
   default_time_limit: number;
-  map_start: "world" | "europe" | "czechia";
+  map_start: MapStart;
 }

@@ -8,6 +8,7 @@ nobody can infer how close they were from their score while the round is open.
 
 import json
 import os
+import random
 import re
 import time
 import uuid
@@ -16,6 +17,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Callable
 
+from . import avatars
+from .hints import Bounds, hint_bounds
 from .quiz import PhotoItem, QuizSettings
 from .scoring import haversine_km, normalize_lng, points_for
 
@@ -53,6 +56,7 @@ class Player:
     name: str
     total: int = 0
     joined_at: float = 0.0
+    avatar: str = ""
 
 
 @dataclass
@@ -69,10 +73,13 @@ class Game:
     ends_at: float | None = None
     closed: bool = False
     prev_ranks: dict[str, int] = field(default_factory=dict)
+    # round index -> the phone map's opening area, when settings.map_start == "photo"
+    start_bounds: dict[int, Bounds] = field(default_factory=dict)
+    rng: random.Random = field(default_factory=random.Random, repr=False)
 
     # ---------------------------------------------------------------- players
 
-    def join(self, name: str, player_id: str | None = None) -> Player:
+    def join(self, name: str, player_id: str | None = None, avatar: str | None = None) -> Player:
         if player_id and player_id in self.banned:
             raise GameError("kicked")
         if player_id and player_id in self.players:
@@ -84,9 +91,17 @@ class Game:
         if any(p.name.casefold() == name.casefold() for p in self.players.values()):
             raise GameError("name_taken")
 
-        player = Player(id=player_id or uuid.uuid4().hex, name=name, joined_at=self.now())
+        player = Player(id=player_id or uuid.uuid4().hex, name=name, joined_at=self.now(),
+                        avatar=avatars.pick(avatar, self.rng))
         self.players[player.id] = player
         return player
+
+    def set_avatar(self, player_id: str, avatar: str) -> None:
+        if player_id not in self.players:
+            raise GameError("not_joined")
+        if not avatars.is_valid(avatar):
+            raise GameError("bad_avatar")
+        self.players[player_id].avatar = avatar
 
     def kick(self, player_id: str) -> None:
         self.players.pop(player_id, None)
@@ -124,7 +139,11 @@ class Game:
         self.phase = Phase.QUESTION
         self.guesses.setdefault(index, {})
         self.closed = False
-        self.ends_at = self.now() + self.time_limit(self.rounds[index])
+        item = self.rounds[index]
+        self.ends_at = self.now() + self.time_limit(item)
+        if self.settings.map_start == "photo" and index not in self.start_bounds:
+            assert item.lat is not None and item.lng is not None
+            self.start_bounds[index] = hint_bounds(item.lat, item.lng, item.scale, self.rng)
 
     def guess(self, player_id: str, lat: float, lng: float) -> Guess:
         if player_id not in self.players:
@@ -189,6 +208,7 @@ class Game:
         self.ends_at = None
         self.closed = False
         self.prev_ranks = {}
+        self.start_bounds = {}
 
     def reset_all(self) -> None:
         """Back to the lobby and forget every player."""
@@ -230,6 +250,7 @@ class Game:
             "ends_at": self.ends_at,
             "closed": self.closed,
             "prev_ranks": self.prev_ranks,
+            "start_bounds": {str(i): b for i, b in self.start_bounds.items()},
         })
 
     @classmethod
@@ -247,6 +268,10 @@ class Game:
         g.ends_at = d["ends_at"]
         g.closed = d["closed"]
         g.prev_ranks = d["prev_ranks"]
+        g.start_bounds = {int(i): b for i, b in d.get("start_bounds", {}).items()}
+        for p in g.players.values():  # saved before avatars existed
+            if not avatars.is_valid(p.avatar):
+                p.avatar = avatars.pick(None, g.rng)
         if g.phase == Phase.QUESTION and g.ends_at is not None and g.ends_at < now():
             g.closed = True  # the timer ran out while the server was down
         return g

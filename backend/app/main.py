@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import photos
+from .avatars import AVATARS
 from .config import load_settings
 from .game import load_game
 from .hub import Hub
@@ -56,6 +57,10 @@ def create_app() -> FastAPI:
     @app.get("/api/map-config")
     def map_config() -> dict:
         return settings.tiles
+
+    @app.get("/api/avatars")
+    def avatar_list() -> list[str]:
+        return AVATARS
 
     # ------------------------------------------------------------ admin API
 

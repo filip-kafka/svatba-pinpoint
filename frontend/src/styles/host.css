@@ -728,3 +728,33 @@ body.idle .dock {
   background: var(--paper);
   z-index: 5000;
 }
+
+/* ------------------------------------------------------------- avatars */
+
+.pointer-avatar {
+  font-size: 1.25em;
+  line-height: 1;
+}
+.step-avatar {
+  font-size: clamp(40px, 5vw, 110px);
+  line-height: 1;
+  margin-bottom: 0.8vh;
+  animation: pop-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  animation-delay: inherit;
+}
+.step-1 .step-avatar {
+  font-size: clamp(52px, 6.5vw, 140px);
+}
+@keyframes pop-in {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+.chips .av {
+  font-size: 1.15em;
+  vertical-align: -0.1em;
+}
+.b-name .av {
+  font-size: 1.1em;
+}

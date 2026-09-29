@@ -237,25 +237,61 @@ label {
   }
 }
 
-/* Guess dots on the reveal map (HTML markers - see guessDotIcon in map.ts). */
+/* Guess avatars on the reveal map (HTML markers - see avatarDotIcon in map.ts). */
 .guess-dot span {
-  display: block;
+  display: grid;
+  place-items: center;
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: var(--guess);
-  border: 2px solid #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  background: #fff;
+  border: 2.5px solid var(--guess);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  font-size: 17px;
+  line-height: 1;
   animation: dot-in 0.35s ease-out both;
 }
 .guess-dot.top span {
-  background: var(--gold);
+  border: 3px solid var(--gold);
+  font-size: 23px;
 }
 @keyframes dot-in {
   from {
     transform: scale(0);
   }
 }
+
+/* The phone's own guess: avatar bubble with a tail pointing at the exact spot. */
+.avatar-pin span {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--guess);
+  font-size: 24px;
+  line-height: 1;
+}
+.avatar-pin span::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -11px;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-top: 9px solid var(--guess);
+  border-bottom: 0;
+}
+
+/* Inline avatars in lists. */
+.av {
+  display: inline-block;
+  margin-right: 0.35em;
+  line-height: 1;
+}
+
 /* Lines to the answer are added once the map has landed, then fade in. */
 .reveal-line {
   animation: line-in 0.6s ease-out both;

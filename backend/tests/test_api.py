@@ -199,3 +199,54 @@ def test_host_keepalive_ping_is_not_an_action(client):
         host.receive_json()
         host.send_json({"type": "ping"})
         assert host.receive_json() == {"type": "pong"}
+
+
+def test_avatars_endpoint_and_websocket_flow(client):
+    avatars = client.get("/api/avatars").json()
+    assert len(avatars) >= 40 and "🦊" in avatars
+
+    client.post("/api/admin/photos", headers=AUTH,
+                files=[("files", ("a.jpg", jpeg_with_gps(), "image/jpeg"))])
+    with client.websocket_connect(f"/ws/host?token={TOKEN}") as host, \
+            client.websocket_connect("/ws/player") as p1:
+        host.receive_json(); p1.receive_json()
+        p1.send_json({"type": "join", "name": "Anna", "avatar": "🦊"})
+        assert recv_until(p1, lambda m: m["type"] == "joined")["avatar"] == "🦊"
+        lobby = recv_until(host, lambda m: m.get("players"))
+        assert lobby["players"][0]["avatar"] == "🦊"
+
+        p1.send_json({"type": "avatar", "avatar": "🐧"})
+        assert recv_until(host, lambda m: m.get("players") and m["players"][0]["avatar"] == "🐧")
+        p1.send_json({"type": "avatar", "avatar": "nope"})
+        assert recv_until(p1, lambda m: m["type"] == "error")["code"] == "bad_avatar"
+
+        host.send_json({"action": "advance"})
+        recv_until(p1, lambda m: m.get("phase") == "question")
+        p1.send_json({"type": "guess", "lat": 50, "lng": 14})
+        recv_until(host, lambda m: m.get("closed"))
+        host.send_json({"action": "advance"})
+        reveal = recv_until(host, lambda m: m.get("phase") == "reveal")
+        assert reveal["guesses"][0]["avatar"] == "🐧"
+        host.send_json({"action": "advance"})
+        final = recv_until(p1, lambda m: m.get("phase") == "final")
+        assert final["me"]["avatar"] == "🐧" and final["podium"][0]["avatar"] == "🐧"
+
+
+def test_hint_area_sent_to_phones_without_the_answer(client):
+    client.post("/api/admin/photos", headers=AUTH,
+                files=[("files", ("a.jpg", jpeg_with_gps(), "image/jpeg"))])
+    s = client.get("/api/admin/quiz", headers=AUTH).json()["settings"]
+    client.put("/api/admin/settings", headers=AUTH, json={**s, "map_start": "photo"})
+    with client.websocket_connect(f"/ws/host?token={TOKEN}") as host, \
+            client.websocket_connect("/ws/player") as p1:
+        host.receive_json(); p1.receive_json()
+        p1.send_json({"type": "join", "name": "Anna"})
+        recv_until(p1, lambda m: m["type"] == "joined")
+        host.send_json({"action": "advance"})
+        q = recv_until(p1, lambda m: m.get("phase") == "question")
+        (south, west), (north, east) = q["start_bounds"]
+        assert south < 50.0755 < north and west < 14.4378 < east
+        assert q["answer"] is None
+        host.send_json({"action": "close"})
+        host.send_json({"action": "advance"})
+        assert recv_until(p1, lambda m: m.get("phase") == "reveal")["start_bounds"] is None

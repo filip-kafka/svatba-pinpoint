@@ -12,8 +12,11 @@
     <main id="app" class="player">
       <header class="topbar">
         <div class="me" hidden>
-          <span class="me-name"></span>
-          <span class="me-points tabular"></span>
+          <span class="me-avatar" aria-hidden="true"></span>
+          <span class="me-text">
+            <span class="me-name"></span>
+            <span class="me-points tabular"></span>
+          </span>
         </div>
         <span class="round-label muted tabular"></span>
         <button class="btn lang-toggle" type="button"></button>
@@ -35,6 +38,10 @@
               <label><span data-t="yourName"></span>
                 <input name="name" maxlength="20" autocomplete="off" autocapitalize="words" enterkeyhint="go" required />
               </label>
+              <div class="avatar-field">
+                <span class="field-label" data-t="pickAvatar"></span>
+                <div class="avatar-grid join-avatars"></div>
+              </div>
               <button class="btn btn-primary join-btn" type="submit" data-t="join"></button>
               <p class="join-error" role="alert" hidden></p>
             </form>
@@ -43,7 +50,10 @@
 
         <!-- 2. Waiting in the lobby -->
         <div data-view="lobby" class="center-view">
-          <div class="pulse-dot" aria-hidden="true"></div>
+          <button class="lobby-avatar" type="button">
+            <span class="lobby-avatar-emoji" aria-hidden="true"></span>
+            <span class="lobby-avatar-change" data-t="changeAvatar"></span>
+          </button>
           <h1 class="display lobby-hello"></h1>
           <p class="muted" data-t="watchScreen"></p>
           <p class="muted lobby-count tabular"></p>
@@ -60,7 +70,7 @@
           </div>
           <div class="action">
             <div class="action-guess">
-              <p class="hint" data-t="tapMap"></p>
+              <p class="hint"></p>
               <button class="btn btn-primary lock-btn" type="button" disabled data-t="lockIn"></button>
             </div>
             <div class="action-status">
@@ -78,6 +88,7 @@
         <!-- 4. Between rounds / final -->
         <div data-view="standing" class="center-view standing">
           <p class="standing-kicker muted"></p>
+          <div class="standing-avatar" aria-hidden="true"></div>
           <div class="rank display tabular"></div>
           <div class="rank-change tabular"></div>
           <p class="standing-total tabular"></p>
@@ -93,6 +104,13 @@
       </section>
 
       <div class="lightbox" hidden><img alt="" /></div>
+      <div class="avatar-sheet" hidden>
+        <div class="sheet">
+          <h2 class="sheet-title" data-t="changeAvatar"></h2>
+          <div class="avatar-grid sheet-avatars"></div>
+          <button class="btn btn-primary sheet-done" type="button" data-t="done"></button>
+        </div>
+      </div>
       <div class="connection-lost" hidden data-t="reconnecting"></div>
     </main>
     <script type="module" src="/src/player.ts"></script>

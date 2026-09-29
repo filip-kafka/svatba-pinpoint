@@ -13,6 +13,7 @@ import argparse
 import asyncio
 import json
 import random
+import urllib.request
 
 import websockets
 
@@ -21,11 +22,21 @@ FIRST = ["Jana", "Petr", "Eva", "Tomáš", "Lucie", "Martin", "Kateřina", "Jaku
 LAST = "NKDSPMHVBR"
 
 
-async def guest(i: int, url: str, stats: dict) -> None:
+def fetch_avatars(ws_url: str) -> list[str]:
+    http_url = ws_url.replace("wss://", "https://", 1).replace("ws://", "http://", 1)
+    try:
+        with urllib.request.urlopen(f"{http_url}/api/avatars", timeout=10) as r:
+            return json.load(r)
+    except OSError:
+        return []  # the server picks random ones
+
+
+async def guest(i: int, url: str, stats: dict, avatars: list[str]) -> None:
     name = f"{random.choice(FIRST)} {LAST[i % len(LAST)]}.{i}"
     await asyncio.sleep(random.random() * 3)  # don't all arrive in the same millisecond
     async with websockets.connect(f"{url}/ws/player") as ws:
-        await ws.send(json.dumps({"type": "join", "name": name}))
+        avatar = random.choice(avatars) if avatars else None
+        await ws.send(json.dumps({"type": "join", "name": name, "avatar": avatar}))
         guessed_round = -1
         async for raw in ws:
             msg = json.loads(raw)
@@ -62,7 +73,9 @@ async def main() -> None:
     args = ap.parse_args()
 
     stats = {"joined": 0, "guesses": 0, "errors": 0}
-    tasks = [asyncio.create_task(guest(i, args.url.rstrip("/"), stats)) for i in range(args.count)]
+    url = args.url.rstrip("/")
+    avatars = fetch_avatars(url)
+    tasks = [asyncio.create_task(guest(i, url, stats, avatars)) for i in range(args.count)]
     print(f"{args.count} guests connecting to {args.url} - Ctrl+C to stop")
     try:
         while True:

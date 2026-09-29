@@ -72,6 +72,12 @@ const strings = {
     err_kicked: "Organizátor tě odebral ze hry.",
     err_no_photos: "Nejsou žádné fotky s polohou.",
     err_generic: "Něco se pokazilo ({code}).",
+    // avatars & hint area
+    pickAvatar: "Vyber si obrázek",
+    changeAvatar: "Změnit obrázek",
+    done: "Hotovo",
+    tapMapHint: "Fotka je někde v rámečku – klepni, kde přesně",
+    err_bad_avatar: "Tenhle obrázek nejde vybrat.",
   },
   en: {
     yourName: "Your name",
@@ -138,6 +144,12 @@ const strings = {
     err_kicked: "The host removed you from the game.",
     err_no_photos: "There are no photos with a location.",
     err_generic: "Something went wrong ({code}).",
+    // avatars & hint area
+    pickAvatar: "Pick your avatar",
+    changeAvatar: "Change avatar",
+    done: "Done",
+    tapMapHint: "The photo was taken inside the frame – tap exactly where",
+    err_bad_avatar: "That avatar isn't available.",
   },
 } satisfies Record<Lang, Record<string, string>>;
 

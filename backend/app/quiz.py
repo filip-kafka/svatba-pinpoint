@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from . import photos as photo_files
 
 Scale = Literal["world", "continent", "country", "city"]
-MapStart = Literal["world", "europe", "czechia"]
+MapStart = Literal["world", "europe", "czechia", "photo"]  # photo = hint area around each answer
 
 
 class PhotoItem(BaseModel):

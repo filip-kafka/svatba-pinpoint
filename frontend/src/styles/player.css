@@ -349,3 +349,129 @@
 .leaflet-control-attribution {
   font-size: 9px;
 }
+
+/* -------------------------------------------------------------- avatars */
+
+.me {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.me-avatar {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+.me-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.avatar-field {
+  display: grid;
+  gap: 0.45em;
+}
+.field-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+.avatar-option {
+  appearance: none;
+  border: 2px solid transparent;
+  background: var(--card);
+  border-radius: 10px;
+  aspect-ratio: 1;
+  font-size: clamp(18px, 5.6vw, 26px);
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+.avatar-option[aria-checked="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: scale(1.08);
+}
+.avatar-option:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.lobby-avatar {
+  all: unset;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+.lobby-avatar-emoji {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 3px solid var(--accent);
+  box-shadow: var(--shadow);
+  font-size: 54px;
+  line-height: 1;
+  animation: pop-in 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.lobby-avatar-change {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@keyframes pop-in {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+}
+
+.avatar-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  background: rgba(30, 26, 22, 0.45);
+  display: flex;
+  align-items: flex-end;
+}
+.sheet {
+  width: 100%;
+  background: var(--paper);
+  border-radius: 18px 18px 0 0;
+  padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+  display: grid;
+  gap: 14px;
+  animation: sheet-up 0.25s ease-out both;
+}
+.sheet-title {
+  margin: 0;
+  font-size: 1.1rem;
+  text-align: center;
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+
+.standing-avatar {
+  font-size: 3.2rem;
+  line-height: 1;
+  margin-top: 10px;
+}
+.podium-avatar {
+  font-size: 1.3rem;
+  line-height: 1;
+}

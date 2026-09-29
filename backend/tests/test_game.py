@@ -149,3 +149,81 @@ def test_persistence_roundtrip_closes_expired_round():
     assert restored.guesses[0][a.id].points == g.guesses[0][a.id].points
     restored.advance()
     assert restored.players[a.id].total > 0
+
+
+# ----------------------------------------------------------------- avatars
+
+import random as _random
+
+from app import avatars
+from app.hints import HINT_SIZE_KM, hint_bounds
+
+
+def test_join_keeps_valid_avatar_and_replaces_invalid_one():
+    g = Game(now=Clock())
+    assert g.join("A", avatar="🦊").avatar == "🦊"
+    b = g.join("B", avatar="<script>")
+    assert avatars.is_valid(b.avatar)
+    assert avatars.is_valid(g.join("C").avatar)
+
+
+def test_set_avatar():
+    g = Game(now=Clock())
+    a = g.join("A", avatar="🦊")
+    g.set_avatar(a.id, "🐧")
+    assert a.avatar == "🐧"
+    with pytest.raises(GameError, match="bad_avatar"):
+        g.set_avatar(a.id, "not-an-avatar")
+
+
+def test_old_save_without_avatars_gets_them():
+    g = Game(now=Clock())
+    g.join("A")
+    import json
+    data = json.loads(g.to_json())
+    for p in data["players"]:
+        del p["avatar"]
+    data.pop("start_bounds")
+    restored = Game.from_json(json.dumps(data))
+    assert avatars.is_valid(restored.standings()[0].avatar)
+
+
+# -------------------------------------------------------------- hint areas
+
+@pytest.mark.parametrize("scale", list(HINT_SIZE_KM))
+@pytest.mark.parametrize("lat,lng", [PRAGUE, SYDNEY, (64.15, -21.94), (-54.8, -68.3), (35.0, 179.5)])
+def test_hint_area_contains_answer_off_centre(scale, lat, lng):
+    rng = _random.Random(7)
+    for _ in range(50):
+        (s, w), (n, e) = hint_bounds(lat, lng, scale, rng)
+        assert s <= lat <= n and w <= lng <= e
+        # answer sits in the middle 60 %, never on an edge
+        fx, fy = (lng - w) / (e - w), (lat - s) / (n - s)
+        assert 0.19 <= fx <= 0.81 and 0.19 <= fy <= 0.81
+        # size in km roughly matches the scale
+        assert haversine_km(s, lng, n, lng) == pytest.approx(HINT_SIZE_KM[scale], rel=0.05)
+
+
+def test_hint_area_positions_vary():
+    rng = _random.Random(1)
+    centres = {tuple(round(v, 3) for v in hint_bounds(*PRAGUE, "country", rng)[0]) for _ in range(20)}
+    assert len(centres) > 15
+
+
+def test_start_bounds_only_with_photo_start():
+    g = Game(now=Clock())
+    g.join("A")
+    g.advance(photos(PRAGUE, SYDNEY), QuizSettings(map_start="europe"))
+    assert g.start_bounds == {}
+
+    g2 = Game(now=Clock())
+    g2.join("A")
+    g2.advance(photos(PRAGUE, SYDNEY), QuizSettings(map_start="photo"))
+    first = g2.start_bounds[0]
+    (s, w), (n, e) = first
+    assert s <= PRAGUE[0] <= n and w <= PRAGUE[1] <= e
+    g2.advance(); g2.advance(); g2.advance()   # reveal, leaderboard, next question
+    assert set(g2.start_bounds) == {0, 1} and g2.start_bounds[0] == first
+
+    restored = Game.from_json(g2.to_json())
+    assert restored.start_bounds == g2.start_bounds
