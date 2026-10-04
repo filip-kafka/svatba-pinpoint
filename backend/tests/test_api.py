@@ -250,3 +250,64 @@ def test_hint_area_sent_to_phones_without_the_answer(client):
         host.send_json({"action": "close"})
         host.send_json({"action": "advance"})
         assert recv_until(p1, lambda m: m.get("phase") == "reveal")["start_bounds"] is None
+
+
+def test_phone_copy_is_smaller_and_clean(client):
+    raw = jpeg_with_gps()
+    big = Image.open(io.BytesIO(raw)).resize((4000, 3000))
+    exif = Image.open(io.BytesIO(raw)).getexif()
+    buf = io.BytesIO()
+    big.save(buf, "JPEG", exif=exif.tobytes())
+    item = client.post("/api/admin/photos", headers=AUTH,
+                       files=[("files", ("big.jpg", buf.getvalue(), "image/jpeg"))]).json()["added"][0]
+    full = Image.open(io.BytesIO(client.get(f"/media/{item['id']}.jpg").content))
+    phone_res = client.get(f"/media/{item['id']}_phone.jpg")
+    phone = Image.open(io.BytesIO(phone_res.content))
+    assert max(full.size) == 2048 and max(phone.size) == 1280
+    assert not phone.getexif(), "phone copy must not carry EXIF either"
+    assert "immutable" in phone_res.headers["cache-control"]
+
+
+def test_startup_creates_missing_phone_copies(tmp_path, monkeypatch):
+    monkeypatch.setenv("PINPOINT_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("PINPOINT_ADMIN_TOKEN", TOKEN)
+    monkeypatch.setenv("PINPOINT_STATIC_DIR", str(tmp_path / "no-static"))
+    with TestClient(create_app()) as c:
+        pid = c.post("/api/admin/photos", headers=AUTH,
+                     files=[("files", ("a.jpg", plain_jpeg(), "image/jpeg"))]).json()["added"][0]["id"]
+    phone = tmp_path / "photos" / f"{pid}_phone.jpg"
+    phone.unlink()  # as if uploaded by an older version
+    with TestClient(create_app()) as c:
+        assert phone.exists()
+        assert c.get(f"/media/{pid}_phone.jpg").status_code == 200
+        c.delete(f"/api/admin/photos/{pid}", headers=AUTH)
+    assert not phone.exists()
+
+
+def test_photo_urls_per_device_and_next_photo(client):
+    ids = [client.post("/api/admin/photos", headers=AUTH,
+                       files=[("files", (f"{i}.jpg", jpeg_with_gps(), "image/jpeg"))]).json()["added"][0]["id"]
+           for i in range(2)]
+    with client.websocket_connect(f"/ws/host?token={TOKEN}") as host, \
+            client.websocket_connect("/ws/player") as p1:
+        lobby_host = host.receive_json()
+        assert lobby_host["photo"] is None and lobby_host["next_photo"] == f"/media/{ids[0]}.jpg"
+        assert p1.receive_json()["next_photo"] == f"/media/{ids[0]}_phone.jpg"
+        p1.send_json({"type": "join", "name": "Anna"})
+        recv_until(p1, lambda m: m["type"] == "joined")
+
+        host.send_json({"action": "advance"})
+        q_host = recv_until(host, lambda m: m["phase"] == "question")
+        q_phone = recv_until(p1, lambda m: m.get("phase") == "question")
+        assert q_host["photo"] == f"/media/{ids[0]}.jpg" and q_phone["photo"] == f"/media/{ids[0]}_phone.jpg"
+        assert q_host["next_photo"] is None, "the next photo is not announced while guessing"
+
+        host.send_json({"action": "close"})
+        host.send_json({"action": "advance"})          # reveal
+        r = recv_until(p1, lambda m: m.get("phase") == "reveal")
+        assert r["next_photo"] == f"/media/{ids[1]}_phone.jpg"
+        host.send_json({"action": "advance"})          # leaderboard
+        assert recv_until(host, lambda m: m["phase"] == "leaderboard")["next_photo"] == f"/media/{ids[1]}.jpg"
+        host.send_json({"action": "advance"}); host.send_json({"action": "close"})
+        host.send_json({"action": "advance"})          # last reveal
+        assert recv_until(host, lambda m: m["phase"] == "reveal" and m["round_index"] == 1)["next_photo"] is None

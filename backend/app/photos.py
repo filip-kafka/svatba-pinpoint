@@ -15,8 +15,10 @@ from pillow_heif import register_heif_opener
 register_heif_opener()  # iPhone photos are HEIC by default
 
 GPS_IFD = 0x8825
-MAX_EDGE = 2048  # enough for a 1080p/1440p projector
-THUMB_EDGE = 480
+MAX_EDGE = 2048    # the projector's copy: enough for a 1080p/1440p screen
+PHONE_EDGE = 1280  # the phones' copy: sharp full screen on a phone, ~3x smaller to download
+PHONE_QUALITY = 80
+THUMB_EDGE = 480   # admin page only
 
 
 class PhotoError(ValueError):
@@ -72,6 +74,8 @@ def process_upload(raw: bytes, photos_dir: Path) -> ProcessedPhoto:
     # No exif= argument -> Pillow writes a clean JPEG with no metadata.
     full.save(photos_dir / f"{photo_id}.jpg", "JPEG", quality=85, optimize=True)
 
+    _save_phone(full, photos_dir / f"{photo_id}_phone.jpg")
+
     thumb = img.copy()
     thumb.thumbnail((THUMB_EDGE, THUMB_EDGE), Image.Resampling.LANCZOS)
     thumb.save(photos_dir / f"{photo_id}_thumb.jpg", "JPEG", quality=80)
@@ -80,6 +84,24 @@ def process_upload(raw: bytes, photos_dir: Path) -> ProcessedPhoto:
     return ProcessedPhoto(photo_id=photo_id, lat=lat, lng=lng)
 
 
+def _save_phone(full: Image.Image, path: Path) -> None:
+    phone = full.copy()
+    phone.thumbnail((PHONE_EDGE, PHONE_EDGE), Image.Resampling.LANCZOS)
+    # Progressive: a blurry version shows up almost at once and sharpens as it loads.
+    phone.save(path, "JPEG", quality=PHONE_QUALITY, optimize=True, progressive=True)
+
+
+def ensure_phone_copy(photo_id: str, photos_dir: Path) -> bool:
+    """Create the phone copy for a photo uploaded before phone copies existed."""
+    target = photos_dir / f"{photo_id}_phone.jpg"
+    source = photos_dir / f"{photo_id}.jpg"
+    if target.exists() or not source.exists():
+        return False
+    with Image.open(source) as img:
+        _save_phone(img.convert("RGB"), target)
+    return True
+
+
 def delete_files(photo_id: str, photos_dir: Path) -> None:
-    for name in (f"{photo_id}.jpg", f"{photo_id}_thumb.jpg"):
+    for name in (f"{photo_id}.jpg", f"{photo_id}_phone.jpg", f"{photo_id}_thumb.jpg"):
         (photos_dir / name).unlink(missing_ok=True)

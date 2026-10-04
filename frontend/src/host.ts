@@ -10,6 +10,7 @@ import { $, esc, showView, toast } from "./shared/dom";
 import { errorText, formatDistance, formatNumber, lang, onLangChange, pick, t, toggleLang } from "./shared/i18n";
 import { avatarSpan } from "./shared/avatars";
 import { answerIcon, avatarDotIcon, createMap, flyThen, L, mapTuning, nearLng, preloadViews, type View } from "./shared/map";
+import { preloadImage } from "./shared/images";
 import { LiveSocket, ServerClock } from "./shared/socket";
 import type { HostState, LeaderRow, PhotoItem, Scale, ServerMessage } from "./shared/types";
 
@@ -63,6 +64,7 @@ function handle(msg: ServerMessage): void {
   if (msg.type !== "state" || msg.role !== "host") return;
   clock.sync(msg.server_now);
   state = msg;
+  preloadImage(msg.next_photo);
   if (preloadedCount === -1) { // first message, whatever the phase (e.g. host page reloaded mid-game)
     preloadedCount = msg.round_count;
     void preloadReveals();

@@ -63,7 +63,15 @@ Points count toward the leaderboard only at the reveal, so nobody can tell how c
    size follows the photo's Scoring: World ≈ 4000 km, Continent ≈ 1600 km, Country ≈ 500 km, City ≈ 60 km
    (`HINT_SIZE_KM` in `backend/app/hints.py`). Guests can still zoom out.
 
-Photos are resized to 2048 px and **all metadata is stripped** before guests see them. Otherwise, anyone could save the image and read the GPS answer from it.
+Photos are resized and **all metadata is stripped** before guests see them. Otherwise, anyone could save the
+image and read the GPS answer from it. Each photo is stored in three sizes: 2048 px for the projector,
+1280 px for phones (progressive JPEG, about 3× smaller, so it pops up blurry at once and sharpens), and a
+480 px thumbnail for the admin page. Photos uploaded with an older version get their phone copy the next
+time the server starts.
+
+Photos never load on the clock: the lobby already downloads round 1's photo onto every device, and each
+reveal downloads the next round's. (A guest digging through their browser's developer tools could see the
+next photo a minute early. At a wedding, that's a risk worth taking.)
 
 ## Running locally (development)
 

@@ -14,6 +14,7 @@ import {
   type MapStart, type View,
 } from "./shared/map";
 import { deeper } from "./shared/tilecache";
+import { preloadImage } from "./shared/images";
 import { LiveSocket, ServerClock } from "./shared/socket";
 import type { AnonymousState, PlayerState, ServerMessage } from "./shared/types";
 
@@ -162,6 +163,7 @@ function handle(msg: ServerMessage): void {
       if (msg.role === "host") return;
       clock.sync(msg.server_now);
       state = msg;
+      preloadImage(msg.next_photo);
       render();
       break;
     case "joined":

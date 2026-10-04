@@ -26,13 +26,17 @@ from .quiz import PhotoItem, PhotoPatch, QuizSettings, QuizStore, dump
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 MAX_UPLOAD_BYTES = 40 * 1024 * 1024
-MEDIA_NAME = re.compile(r"^[0-9a-f]{32}(_thumb)?\.jpg$")
+MEDIA_NAME = re.compile(r"^[0-9a-f]{32}(_thumb|_phone)?\.jpg$")
 
 
 def create_app() -> FastAPI:
     settings = load_settings()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     store = QuizStore(settings.data_dir)
+    # Photos uploaded with an older version have no phone copy yet; make them now.
+    made = sum(photos.ensure_phone_copy(p.id, store.photos_dir) for p in store.quiz.photos)
+    if made:
+        logging.getLogger("pinpoint").info("Created phone copies for %d photos", made)
     game_path = settings.data_dir / "game.json"
     hub = Hub(load_game(game_path), store, game_path, settings.admin_token, settings.max_players)
 

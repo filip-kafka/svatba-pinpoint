@@ -27,6 +27,8 @@ interface CommonState {
   /** Hint area [[south, west], [north, east]] when map_start is "photo"; only while guessing. */
   start_bounds: [[number, number], [number, number]] | null;
   photo: string | null;
+  /** The next round's photo, announced early so devices can download it in the background. */
+  next_photo: string | null;
   player_count: number;
 }
 

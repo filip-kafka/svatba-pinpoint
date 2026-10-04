@@ -22,8 +22,9 @@ log = logging.getLogger("pinpoint.hub")
 EXTEND_SECONDS = 15
 
 
-def photo_url(photo_id: str) -> str:
-    return f"/media/{photo_id}.jpg"
+def photo_url(photo_id: str, phone: bool = False) -> str:
+    """Phones get a lighter copy (see photos.PHONE_EDGE); the projector the full one."""
+    return f"/media/{photo_id}_phone.jpg" if phone else f"/media/{photo_id}.jpg"
 
 
 class Hub:
@@ -91,7 +92,18 @@ class Hub:
 
     # ---------------------------------------------------------------- views
 
-    def _common(self) -> dict[str, Any]:
+    def _next_photo_id(self) -> str | None:
+        """The photo coming up next, so devices can download it before it's shown:
+        round 1's in the lobby, the next round's during the reveal and leaderboard."""
+        g = self.game
+        if g.phase == Phase.LOBBY:
+            upcoming = self.store.playable_photos()
+            return upcoming[0].id if upcoming else None
+        if g.phase in (Phase.REVEAL, Phase.LEADERBOARD) and g.round_index + 1 < len(g.rounds):
+            return g.rounds[g.round_index + 1].id
+        return None
+
+    def _common(self, phone: bool) -> dict[str, Any]:
         g = self.game
         settings = g.settings if g.phase != Phase.LOBBY else self.store.quiz.settings
         item = g.current
@@ -111,7 +123,8 @@ class Hub:
             "map_start": settings.map_start,
             # the hint area only (never the answer itself), and only while guessing
             "start_bounds": g.start_bounds.get(g.round_index) if g.phase == Phase.QUESTION else None,
-            "photo": photo_url(item.id) if show_photo and item else None,
+            "photo": photo_url(item.id, phone) if show_photo and item else None,
+            "next_photo": photo_url(next_id, phone) if (next_id := self._next_photo_id()) else None,
             "player_count": len(g.players),
         }
 
@@ -136,7 +149,7 @@ class Hub:
     def host_view(self, ranks: dict[str, int]) -> dict[str, Any]:
         g = self.game
         connected = self.connected_ids()
-        view = self._common()
+        view = self._common(phone=False)
         view.update({
             "role": "host",
             "players": [{"id": p.id, "name": p.name, "avatar": p.avatar, "connected": p.id in connected}
@@ -162,7 +175,7 @@ class Hub:
 
     def player_view(self, pid: str, ranks: dict[str, int]) -> dict[str, Any]:
         g = self.game
-        view = self._common()
+        view = self._common(phone=True)
         player = g.players.get(pid)
         guess = g.guesses.get(g.round_index, {}).get(pid)
         view.update({
@@ -185,7 +198,7 @@ class Hub:
         return view
 
     def public_view(self) -> dict[str, Any]:
-        view = self._common()
+        view = self._common(phone=True)
         view["role"] = "anonymous"
         return view
 
