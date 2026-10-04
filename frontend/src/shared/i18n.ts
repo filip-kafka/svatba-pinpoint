@@ -8,17 +8,17 @@ const strings = {
     yourName: "Tvoje jméno",
     namePlaceholder: "např. teta Jarka",
     join: "Hrát",
-    joining: "Připojuji…",
+    joining: "Připojuji se…",
     youreIn: "Jsi ve hře, {name}!",
-    watchScreen: "Sleduj plátno – hra brzy začne.",
-    joinedCount: "Připojeno hráčů: {n}",
-    round: "Kolo {i} z {n}",
+    watchScreen: "Sleduj velkou obrazovku – hra brzy začne.",
+    joinedCount: "Počet hráčů: {n}",
+    round: "Kolo {i} / {n}",
     tapMap: "Klepni do mapy, kde byla fotka pořízena",
     lockIn: "Potvrdit tip",
     guessLocked: "Tip uložen ✓",
     waitingOthers: "Čekáme na ostatní…",
     timesUp: "Čas vypršel",
-    noGuess: "V tomhle kole bez tipu",
+    noGuess: "V tomhle kole jsi bez tipu",
     kmAway: "{d} daleko",
     points: "{n} b.",
     pointsLong: "{n} bodů",
@@ -27,7 +27,7 @@ const strings = {
     lookUp: "Podívej se na plátno!",
     finalTitle: "Konec hry!",
     youFinished: "Skončil(a) jsi na {rank}. místě",
-    thanks: "Díky za hraní ♥",
+    thanks: "Díky za hru ♥",
     kicked: "Organizátor tě odebral ze hry.",
     gameReset: "Hra byla restartována.",
     joinAgain: "Připojit se znovu",
@@ -37,14 +37,14 @@ const strings = {
     joinAt: "Připoj se na",
     orScan: "nebo naskenuj kód",
     players: "Hráči",
-    noPlayersYet: "Zatím nikdo… naskenujte QR kód!",
-    pressToStart: "→ / mezerník pro start",
+    noPlayersYet: "Je tu nějak prázdno… naskenujte QR kód!",
+    pressToStart: "→ / odstartovat hru",
     pressToReveal: "→ odhalit odpověď",
     pressToContinue: "→ pokračovat",
     answered: "odpovědělo",
     closest: "Nejblíž",
     leaderboard: "Průběžné pořadí",
-    photosReady: "Připravených fotek: {n}",
+    photosReady: "Připraveno {n} fotek",
     photosMissing: "Fotek bez polohy: {n} (nebudou ve hře)",
     noPhotos: "Nejdřív nahraj fotky v administraci.",
     next: "Další",
@@ -52,7 +52,7 @@ const strings = {
     closeRound: "Ukončit kolo",
     fullscreen: "Celá obrazovka",
     resetScores: "Nová hra (ponechat hráče)",
-    resetAll: "Nová hra (odpojit všechny)",
+    resetAll: "Nová hra (odpojit hráče)",
     confirmReset: "Opravdu začít znovu? Body se vynulují.",
     confirmResetAll: "Opravdu? Všichni hráči budou odpojeni.",
     confirmKick: "Odebrat hráče {name}?",
@@ -66,7 +66,7 @@ const strings = {
     login: "Přihlásit",
     badToken: "Špatné heslo",
     // errors from server
-    err_name_taken: "Tohle jméno už někdo má – přidej třeba příjmení.",
+    err_name_taken: "Tohle jméno už má někdo jiný.",
     err_name_empty: "Napiš své jméno.",
     err_round_closed: "Kolo už skončilo.",
     err_already_guessed: "Už jsi tipoval(a).",
@@ -78,7 +78,8 @@ const strings = {
     pickAvatar: "Vyber si obrázek",
     changeAvatar: "Změnit obrázek",
     done: "Hotovo",
-    tapMapHint: "Fotka je někde v rámečku – klepni, kde přesně",
+    tapMapHint:
+      "Fotka byla pořízena někde uvnitř této oblasti – najdi a vyber kde přesně",
     err_bad_avatar: "Tenhle obrázek nejde vybrat.",
   },
   en: {
@@ -167,7 +168,8 @@ function initialLang(): Lang {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === "cs" || saved === "en") return saved;
   } catch {}
-  return navigator.language.toLowerCase().startsWith("cs") || navigator.language.toLowerCase().startsWith("sk")
+  return navigator.language.toLowerCase().startsWith("cs") ||
+    navigator.language.toLowerCase().startsWith("sk")
     ? "cs"
     : "en";
 }
@@ -192,8 +194,12 @@ export function onLangChange(fn: () => void): void {
   listeners.add(fn);
 }
 
-export function t(key: Key, vars: Record<string, string | number> = {}): string {
-  const s: string = (strings[current] as Record<string, string>)[key] ?? strings.en[key] ?? key;
+export function t(
+  key: Key,
+  vars: Record<string, string | number> = {},
+): string {
+  const s: string =
+    (strings[current] as Record<string, string>)[key] ?? strings.en[key] ?? key;
   return s.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ""));
 }
 
@@ -203,17 +209,22 @@ export function errorText(code: string): string {
 }
 
 /** Pick the caption / title in the current language, falling back to the other one. */
-export function pick(texts: { cs: string; en: string } | null | undefined): string {
+export function pick(
+  texts: { cs: string; en: string } | null | undefined,
+): string {
   if (!texts) return "";
   return texts[current] || texts[current === "cs" ? "en" : "cs"] || "";
 }
 
 export function formatNumber(n: number): string {
-  return new Intl.NumberFormat(current === "cs" ? "cs-CZ" : "en-GB").format(Math.round(n));
+  return new Intl.NumberFormat(current === "cs" ? "cs-CZ" : "en-GB").format(
+    Math.round(n),
+  );
 }
 
 export function formatDistance(km: number): string {
   if (km < 1) return `${formatNumber(km * 1000)} m`;
-  if (km < 10) return `${new Intl.NumberFormat(current === "cs" ? "cs-CZ" : "en-GB", { maximumFractionDigits: 1 }).format(km)} km`;
+  if (km < 10)
+    return `${new Intl.NumberFormat(current === "cs" ? "cs-CZ" : "en-GB", { maximumFractionDigits: 1 }).format(km)} km`;
   return `${formatNumber(km)} km`;
 }
