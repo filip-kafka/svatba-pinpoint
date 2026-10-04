@@ -7,12 +7,37 @@ import QRCode from "qrcode";
 
 import { requireToken, forgetToken } from "./shared/auth";
 import { $, esc, showView, toast } from "./shared/dom";
-import { errorText, formatDistance, formatNumber, lang, onLangChange, pick, t, toggleLang } from "./shared/i18n";
+import {
+  errorText,
+  formatDistance,
+  formatNumber,
+  lang,
+  onLangChange,
+  pick,
+  t,
+  toggleLang,
+} from "./shared/i18n";
 import { avatarSpan } from "./shared/avatars";
-import { answerIcon, avatarDotIcon, createMap, flyThen, L, mapTuning, nearLng, preloadViews, type View } from "./shared/map";
+import {
+  answerIcon,
+  avatarDotIcon,
+  createMap,
+  flyThen,
+  L,
+  mapTuning,
+  nearLng,
+  preloadViews,
+  type View,
+} from "./shared/map";
 import { preloadImage } from "./shared/images";
 import { LiveSocket, ServerClock } from "./shared/socket";
-import type { HostState, LeaderRow, PhotoItem, Scale, ServerMessage } from "./shared/types";
+import type {
+  HostState,
+  LeaderRow,
+  PhotoItem,
+  Scale,
+  ServerMessage,
+} from "./shared/types";
 
 const stage = $(".stage");
 const dock = $(".dock");
@@ -23,7 +48,7 @@ const joinUrlShort = location.host;
 
 let state: HostState | null = null;
 let socket: LiveSocket;
-let lastKey = "";       // phase+round we last built the view for
+let lastKey = ""; // phase+round we last built the view for
 let lastAdvance = 0;
 
 // ------------------------------------------------------------------- setup
@@ -34,7 +59,9 @@ stage.hidden = false;
 dock.hidden = false;
 
 QRCode.toString(joinUrl, {
-  type: "svg", margin: 0, errorCorrectionLevel: "M",
+  type: "svg",
+  margin: 0,
+  errorCorrectionLevel: "M",
   color: { dark: "#2a2724ff", light: "#00000000" },
 }).then((svg) => {
   $(".qr").innerHTML = svg;
@@ -65,7 +92,8 @@ function handle(msg: ServerMessage): void {
   clock.sync(msg.server_now);
   state = msg;
   preloadImage(msg.next_photo);
-  if (preloadedCount === -1) { // first message, whatever the phase (e.g. host page reloaded mid-game)
+  if (preloadedCount === -1) {
+    // first message, whatever the phase (e.g. host page reloaded mid-game)
     preloadedCount = msg.round_count;
     void preloadReveals();
   }
@@ -120,8 +148,11 @@ function renderLobby(s: HostState): void {
   const warnings: string[] = [];
   if (s.round_count === 0) warnings.push(t("noPhotos"));
   else warnings.push(t("photosReady", { n: s.round_count }));
-  if (s.missing_location_count) warnings.push(t("photosMissing", { n: s.missing_location_count }));
-  $(".lobby-warnings").innerHTML = warnings.map((w) => `<span>${esc(w)}</span>`).join("");
+  if (s.missing_location_count)
+    warnings.push(t("photosMissing", { n: s.missing_location_count }));
+  $(".lobby-warnings").innerHTML = warnings
+    .map((w) => `<span>${esc(w)}</span>`)
+    .join("");
   $(".lobby-warnings").classList.toggle("bad", s.round_count === 0);
   if (s.round_count !== preloadedCount) {
     preloadedCount = s.round_count;
@@ -135,13 +166,16 @@ function renderLobby(s: HostState): void {
     if (!present.has(li.dataset.id!)) li.remove();
   });
   for (const p of s.players) {
-    let li = list.querySelector<HTMLElement>(`li[data-id="${CSS.escape(p.id)}"]`);
+    let li = list.querySelector<HTMLElement>(
+      `li[data-id="${CSS.escape(p.id)}"]`,
+    );
     if (!li) {
       li = document.createElement("li");
       li.dataset.id = p.id;
       list.append(li);
     }
-    if (li.dataset.avatar !== p.avatar) { // new chip, or the guest picked another avatar
+    if (li.dataset.avatar !== p.avatar) {
+      // new chip, or the guest picked another avatar
       li.dataset.avatar = p.avatar;
       li.innerHTML = `${avatarSpan(p.avatar)}${esc(p.name)}`;
     }
@@ -189,8 +223,12 @@ function renderQuestion(s: HostState, fresh: boolean): void {
     const img = $<HTMLImageElement>(".q-photo img");
     img.src = s.photo ?? "";
   }
-  $(".q-round").textContent = t("round", { i: s.round_index + 1, n: s.round_count });
-  $(".q-answered strong").textContent = `${s.answered_count} / ${s.connected_count}`;
+  $(".q-round").textContent = t("round", {
+    i: s.round_index + 1,
+    n: s.round_count,
+  });
+  $(".q-answered strong").textContent =
+    `${s.answered_count} / ${s.connected_count}`;
   $(".q-answered span").textContent = t("answered");
   $(".q-closed").textContent = s.closed ? t("timesUp") : "";
   $(".q-join").textContent = `${t("joinAt")} ${joinUrlShort}`;
@@ -205,7 +243,12 @@ let flying = false;
 const revealLayer = L.layerGroup();
 
 /** How far the reveal zooms in, by the photo's scoring scale (admin → Scoring). */
-const REVEAL_ZOOM: Record<Scale, number> = { world: 7, continent: 8, country: 9, city: 13 };
+const REVEAL_ZOOM: Record<Scale, number> = {
+  world: 7,
+  continent: 8,
+  country: 9,
+  city: 13,
+};
 
 /**
  * The close-up. After landing on the answer at REVEAL_ZOOM, if the closest guess
@@ -213,25 +256,41 @@ const REVEAL_ZOOM: Record<Scale, number> = { world: 7, continent: 8, country: 9,
  * guess fill the free part of the screen - so a great guess gets a big moment.
  */
 const CLOSE_UP = {
-  maxZoom: 16,          // never closer than this (13 ≈ a city, 16 ≈ streets and buildings)
-  minGain: 1,           // only dive if it gets at least this many zoom levels closer
-  pauseMs: 1400,        // how long the regional view stays before the dive
-  duration: 2.2,        // seconds the dive takes
+  maxZoom: 16, // never closer than this (13 ≈ a city, 16 ≈ streets and buildings)
+  minGain: 1, // only dive if it gets at least this many zoom levels closer
+  pauseMs: 1000, // how long the regional view stays before the dive
+  duration: 2.2, // seconds the dive takes
   margin: [170, 150] as L.PointTuple, // px kept free around the pair for pins and names
 };
 
 /** Where the close-up would go, or null if it isn't worth diving for. */
-function closeUpPlan(m: L.Map, answer: L.LatLng, closest: L.LatLng | undefined, baseZoom: number) {
+function closeUpPlan(
+  m: L.Map,
+  answer: L.LatLng,
+  closest: L.LatLng | undefined,
+  baseZoom: number,
+) {
   if (!closest) return null;
   const bounds = L.latLngBounds([answer, closest]);
   const topLeft: L.PointTuple = [CLOSE_UP.margin[0], CLOSE_UP.margin[1]];
-  const bottomRight: L.PointTuple = [panelInset() + CLOSE_UP.margin[0], CLOSE_UP.margin[1] + 60]; // + the hint line
+  const bottomRight: L.PointTuple = [
+    panelInset() + CLOSE_UP.margin[0],
+    CLOSE_UP.margin[1] + 60,
+  ]; // + the hint line
   const zoom = Math.min(
     CLOSE_UP.maxZoom,
     m.getBoundsZoom(bounds, false, L.point(topLeft).add(bottomRight)),
   );
   if (zoom < baseZoom + CLOSE_UP.minGain) return null;
-  return { bounds, zoom, options: { paddingTopLeft: topLeft, paddingBottomRight: bottomRight, maxZoom: CLOSE_UP.maxZoom } };
+  return {
+    bounds,
+    zoom,
+    options: {
+      paddingTopLeft: topLeft,
+      paddingBottomRight: bottomRight,
+      maxZoom: CLOSE_UP.maxZoom,
+    },
+  };
 }
 
 // ------------------------------------------------------------ map preload
@@ -246,30 +305,44 @@ let preloadKey = "";
  * The host has the organizer token, so it can read the answers from the admin API.
  */
 async function preloadReveals(): Promise<void> {
-  const r = await fetch("/api/admin/quiz", { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+  const r = await fetch("/api/admin/quiz", {
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => null);
   if (!r?.ok) return;
-  const photos = ((await r.json()) as { photos: PhotoItem[] }).photos
-    .filter((p): p is PhotoItem & { lat: number; lng: number } => p.lat != null && p.lng != null);
-  const key = photos.map((p) => `${p.id}:${p.lat}:${p.lng}:${p.scale}`).join("|");
+  const photos = ((await r.json()) as { photos: PhotoItem[] }).photos.filter(
+    (p): p is PhotoItem & { lat: number; lng: number } =>
+      p.lat != null && p.lng != null,
+  );
+  const key = photos
+    .map((p) => `${p.id}:${p.lat}:${p.lng}:${p.scale}`)
+    .join("|");
   if (!photos.length || key === preloadKey) return;
   preloadKey = key;
 
   // The answer sits beside the side panel, so cover a wider area than the screen.
-  const w = window.innerWidth * 1.3, h = window.innerHeight;
+  const w = window.innerWidth * 1.3,
+    h = window.innerHeight;
   const views: View[] = [
     { lat: 25, lng: 10, zoom: 1.6, width: window.innerWidth, height: h }, // where every reveal starts
-    { lat: 0, lng: 0, zoom: 2, width: 1024, height: 1024 },               // the whole world, two
-    { lat: 0, lng: 0, zoom: 3, width: 2048, height: 2048 },               // coarse levels deep
+    { lat: 0, lng: 0, zoom: 2, width: 1024, height: 1024 }, // the whole world, two
+    { lat: 0, lng: 0, zoom: 3, width: 2048, height: 2048 }, // coarse levels deep
   ];
   for (const p of photos) {
     const z = REVEAL_ZOOM[p.scale] ?? REVEAL_ZOOM.world;
     // Landing view and the three levels just before it, all centred on the answer ...
-    for (let dz = 0; dz <= 3 && z - dz >= 3; dz++) views.push({ lat: p.lat, lng: p.lng, zoom: z - dz, width: w, height: h });
+    for (let dz = 0; dz <= 3 && z - dz >= 3; dz++)
+      views.push({ lat: p.lat, lng: p.lng, zoom: z - dz, width: w, height: h });
     // ... and the middle of the flight, sampled along the way from the world view.
     const lng = nearLng(p.lng, 10);
     for (let k = 4; k <= z - 4; k++) {
       for (const t of [0.6, 0.85]) {
-        views.push({ lat: 25 + (p.lat - 25) * t, lng: 10 + (lng - 10) * t, zoom: k, width: w, height: h });
+        views.push({
+          lat: 25 + (p.lat - 25) * t,
+          lng: 10 + (lng - 10) * t,
+          zoom: k,
+          width: w,
+          height: h,
+        });
       }
     }
   }
@@ -278,7 +351,8 @@ async function preloadReveals(): Promise<void> {
   const show = (done: number, total: number) => {
     status.hidden = false;
     status.classList.toggle("done", done >= total);
-    status.textContent = done >= total ? t("mapReady") : t("mapPreloading", { done, total });
+    status.textContent =
+      done >= total ? t("mapReady") : t("mapPreloading", { done, total });
   };
   const vector = await preloadViews(views, { onProgress: show });
   if (!vector) status.hidden = true; // raster maps aren't pre-loaded
@@ -287,7 +361,12 @@ async function preloadReveals(): Promise<void> {
 /** What the edge pointers need: the answer and the five closest guesses (already sorted). */
 let pointerData: {
   answer: L.LatLng;
-  closest: { name: string; avatar: string; ll: L.LatLng; distance_km: number }[];
+  closest: {
+    name: string;
+    avatar: string;
+    ll: L.LatLng;
+    distance_km: number;
+  }[];
 } | null = null;
 
 /** Width of map hidden under the side panel, so "on screen" means actually visible. */
@@ -299,10 +378,17 @@ function panelInset(): number {
 
 function renderReveal(s: HostState): void {
   if (!revealMap) {
-    revealMap = createMap($("#reveal-map"), { zoomControl: false, attributionControl: true });
+    revealMap = createMap($("#reveal-map"), {
+      zoomControl: false,
+      attributionControl: true,
+    });
     revealLayer.addTo(revealMap);
-    revealMap.on("moveend", () => { if (!flying) renderPointers(); });
-    window.addEventListener("resize", () => { if (state?.phase === "reveal" && !flying) renderPointers(); });
+    revealMap.on("moveend", () => {
+      if (!flying) renderPointers();
+    });
+    window.addEventListener("resize", () => {
+      if (state?.phase === "reveal" && !flying) renderPointers();
+    });
   }
   const m = revealMap;
   requestAnimationFrame(() => m.invalidateSize());
@@ -311,25 +397,51 @@ function renderReveal(s: HostState): void {
 
   const a = s.answer!;
   const answer = L.latLng(a.lat, a.lng);
-  const guesses = (s.guesses ?? []).map((g) => ({ ...g, ll: L.latLng(g.lat, nearLng(g.lng, a.lng)) }));
+  const guesses = (s.guesses ?? []).map((g) => ({
+    ...g,
+    ll: L.latLng(g.lat, nearLng(g.lng, a.lng)),
+  }));
   pointerData = { answer, closest: guesses.slice(0, 5) };
 
   guesses.forEach((g, i) => {
-    const dot = L.marker(g.ll, { icon: avatarDotIcon(g.avatar, i < 3), keyboard: false, zIndexOffset: i < 3 ? 500 - i : 0 })
-      .addTo(revealLayer);
+    const dot = L.marker(g.ll, {
+      icon: avatarDotIcon(g.avatar, i < 3),
+      keyboard: false,
+      zIndexOffset: i < 3 ? 500 - i : 0,
+    }).addTo(revealLayer);
     if (i < 3) {
       // Spread the three labels so nearby guesses don't cover each other.
       const dir = (["top", "bottom", "right"] as const)[i];
-      const offset: L.PointTuple = [[0, -24], [0, 24], [24, 0]][i] as L.PointTuple;
-      dot.bindTooltip(esc(g.name), { permanent: true, direction: dir, className: "guess-label", offset });
+      const offset: L.PointTuple = [
+        [0, -24],
+        [0, 24],
+        [24, 0],
+      ][i] as L.PointTuple;
+      dot.bindTooltip(esc(g.name), {
+        permanent: true,
+        direction: dir,
+        className: "guess-label",
+        offset,
+      });
     }
   });
-  L.marker(answer, { icon: answerIcon, zIndexOffset: 1000, keyboard: false }).addTo(revealLayer);
+  L.marker(answer, {
+    icon: answerIcon,
+    zIndexOffset: 1000,
+    keyboard: false,
+  }).addTo(revealLayer);
 
   const drawLines = () => {
-    guesses.forEach((g) => L.polyline([g.ll, answer], {
-      color: "#2a2724", weight: 1.5, opacity: 0.25, dashArray: "4 6", className: "reveal-line", interactive: false,
-    }).addTo(revealLayer));
+    guesses.forEach((g) =>
+      L.polyline([g.ll, answer], {
+        color: "#2a2724",
+        weight: 1.5,
+        opacity: 0.25,
+        dashArray: "4 6",
+        className: "reveal-line",
+        interactive: false,
+      }).addTo(revealLayer),
+    );
   };
 
   m.setView([25, 10], 1.6, { animate: false });
@@ -339,11 +451,15 @@ function renderReveal(s: HostState): void {
   if (closeUp) {
     // Start downloading the close-up now; the first flight and the pause give it ~3.5 s.
     const c = closeUp.bounds.getCenter();
-    const w = window.innerWidth * 1.3, h = window.innerHeight;
-    void preloadViews([
-      { lat: c.lat, lng: c.lng, zoom: closeUp.zoom, width: w, height: h },
-      { lat: c.lat, lng: c.lng, zoom: closeUp.zoom - 1, width: w, height: h },
-    ], { urgent: true });
+    const w = window.innerWidth * 1.3,
+      h = window.innerHeight;
+    void preloadViews(
+      [
+        { lat: c.lat, lng: c.lng, zoom: closeUp.zoom, width: w, height: h },
+        { lat: c.lat, lng: c.lng, zoom: closeUp.zoom - 1, width: w, height: h },
+      ],
+      { urgent: true },
+    );
   }
 
   const finish = () => {
@@ -357,17 +473,33 @@ function renderReveal(s: HostState): void {
     if (token !== revealToken) return; // a newer reveal (or language switch) took over
     const duration = 1.8;
     // Centre the answer in the part of the map the side panel doesn't cover.
-    const center = m.unproject(m.project(answer, zoom).add([panelInset() / 2, 0]), zoom);
+    const center = m.unproject(
+      m.project(answer, zoom).add([panelInset() / 2, 0]),
+      zoom,
+    );
     flying = true;
-    flyThen(m, () => m.flyTo(center, zoom, { duration }), () => {
-      if (token !== revealToken || !closeUp) return finish();
-      // Let everyone take in the regional view, then dive to the closest guess.
-      setTimeout(() => {
-        if (token !== revealToken) return;
-        flyThen(m, () => m.flyToBounds(closeUp.bounds, { ...closeUp.options, duration: CLOSE_UP.duration }),
-          finish, CLOSE_UP.duration);
-      }, CLOSE_UP.pauseMs);
-    }, duration);
+    flyThen(
+      m,
+      () => m.flyTo(center, zoom, { duration }),
+      () => {
+        if (token !== revealToken || !closeUp) return finish();
+        // Let everyone take in the regional view, then dive to the closest guess.
+        setTimeout(() => {
+          if (token !== revealToken) return;
+          flyThen(
+            m,
+            () =>
+              m.flyToBounds(closeUp.bounds, {
+                ...closeUp.options,
+                duration: CLOSE_UP.duration,
+              }),
+            finish,
+            CLOSE_UP.duration,
+          );
+        }, CLOSE_UP.pauseMs);
+      },
+      duration,
+    );
   }, 350);
 
   $<HTMLImageElement>(".reveal-thumb").src = s.photo ?? "";
@@ -375,18 +507,28 @@ function renderReveal(s: HostState): void {
   $(".reveal-caption").textContent = caption;
   $(".reveal-caption").hidden = !caption;
   $(".reveal-closest-label").textContent = t("closest");
-  $(".closest").innerHTML = guesses.slice(0, 5).map((g) => `
+  $(".closest").innerHTML =
+    guesses
+      .slice(0, 5)
+      .map(
+        (g) => `
     <li><span class="c-name">${avatarSpan(g.avatar)}${esc(g.name)}</span>
       <span class="c-dist muted tabular">${esc(formatDistance(g.distance_km))}</span>
-      <span class="c-pts tabular">+${esc(formatNumber(g.points))}</span></li>`).join("")
-    || `<li class="muted">–</li>`;
+      <span class="c-pts tabular">+${esc(formatNumber(g.points))}</span></li>`,
+      )
+      .join("") || `<li class="muted">–</li>`;
 }
 
 const POINTER_MAX_WIDTH = 320; // px; long names shrink the label's font instead of being cut off
-const POINTER_NAME_MAX = 20;   // characters; the server caps names at 20 too
+const POINTER_NAME_MAX = 20; // characters; the server caps names at 20 too
 
 const shortName = (name: string): string =>
-  [...name].length > POINTER_NAME_MAX ? `${[...name].slice(0, POINTER_NAME_MAX - 1).join("").trimEnd()}…` : name;
+  [...name].length > POINTER_NAME_MAX
+    ? `${[...name]
+        .slice(0, POINTER_NAME_MAX - 1)
+        .join("")
+        .trimEnd()}…`
+    : name;
 
 /**
  * Any of the five closest guesses that is outside the zoomed-in view gets a
@@ -396,19 +538,30 @@ function renderPointers(): void {
   const box = $(".reveal-pointers");
   box.innerHTML = "";
   const m = revealMap;
-  if (!m || !pointerData || state?.phase !== "reveal" || !pointerData.closest.length) return;
+  if (
+    !m ||
+    !pointerData ||
+    state?.phase !== "reveal" ||
+    !pointerData.closest.length
+  )
+    return;
 
   const size = m.getSize();
   const right = size.x - panelInset();
-  const onScreen = (p: L.Point) => p.x >= 16 && p.x <= right - 16 && p.y >= 16 && p.y <= size.y - 16;
+  const onScreen = (p: L.Point) =>
+    p.x >= 16 && p.x <= right - 16 && p.y >= 16 && p.y <= size.y - 16;
   const offScreen = pointerData.closest
     .map((g, i) => ({ ...g, rank: i + 1, pt: m.latLngToContainerPoint(g.ll) }))
     .filter((g) => !onScreen(g.pt));
   if (!offScreen.length) return;
 
   // The box pointer centres are placed on; margins keep the widest label on screen.
-  const mx = POINTER_MAX_WIDTH / 2 + 12, my = 56;
-  const minX = mx, maxX = right - mx, minY = my, maxY = size.y - my - 80; // keep clear of the "→ continue" hint
+  const mx = POINTER_MAX_WIDTH / 2 + 12,
+    my = 56;
+  const minX = mx,
+    maxX = right - mx,
+    minY = my,
+    maxY = size.y - my - 80; // keep clear of the "→ continue" hint
   const origin = m.latLngToContainerPoint(pointerData.answer);
   const placed: { x: number; y: number; w: number; h: number }[] = [];
   const GAP = 8;
@@ -416,16 +569,27 @@ function renderPointers(): void {
   // Things already on the map that a pointer must not cover: the answer pin and the
   // visible top-3 avatars with their name labels.
   const mapRect = $("#reveal-map").getBoundingClientRect();
-  document.querySelectorAll<HTMLElement>(
-    "#reveal-map .pin-answer, #reveal-map .guess-dot.top, #reveal-map .leaflet-tooltip.guess-label",
-  ).forEach((el) => {
-    const r = el.getBoundingClientRect();
-    const visible = r.width > 0 && r.right > mapRect.left && r.left < mapRect.right
-      && r.bottom > mapRect.top && r.top < mapRect.bottom;
-    if (visible) {
-      placed.push({ x: r.left - mapRect.left + r.width / 2, y: r.top - mapRect.top + r.height / 2, w: r.width, h: r.height });
-    }
-  });
+  document
+    .querySelectorAll<HTMLElement>(
+      "#reveal-map .pin-answer, #reveal-map .guess-dot.top, #reveal-map .leaflet-tooltip.guess-label",
+    )
+    .forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const visible =
+        r.width > 0 &&
+        r.right > mapRect.left &&
+        r.left < mapRect.right &&
+        r.bottom > mapRect.top &&
+        r.top < mapRect.bottom;
+      if (visible) {
+        placed.push({
+          x: r.left - mapRect.left + r.width / 2,
+          y: r.top - mapRect.top + r.height / 2,
+          w: r.width,
+          h: r.height,
+        });
+      }
+    });
 
   offScreen.forEach((g, i) => {
     const dx = g.pt.x - origin.x;
@@ -452,12 +616,21 @@ function renderPointers(): void {
       fontPx *= 0.93;
       el.style.fontSize = `${fontPx}px`;
     }
-    const w = el.offsetWidth, h = el.offsetHeight;
+    const w = el.offsetWidth,
+      h = el.offsetHeight;
 
     // Walk from the answer towards the guess until the ray leaves the box.
     const ts = [
-      dx > 0 ? (maxX - origin.x) / dx : dx < 0 ? (minX - origin.x) / dx : Infinity,
-      dy > 0 ? (maxY - origin.y) / dy : dy < 0 ? (minY - origin.y) / dy : Infinity,
+      dx > 0
+        ? (maxX - origin.x) / dx
+        : dx < 0
+          ? (minX - origin.x) / dx
+          : Infinity,
+      dy > 0
+        ? (maxY - origin.y) / dy
+        : dy < 0
+          ? (minY - origin.y) / dy
+          : Infinity,
     ];
     const t = Math.min(...ts);
     const x0 = Math.min(maxX, Math.max(minX, origin.x + dx * t));
@@ -465,9 +638,14 @@ function renderPointers(): void {
     const slideY = ts[0] <= ts[1]; // on a left/right edge we slide vertically
 
     // Slide along the edge (0, +1, -1, +2, -2 … steps) until it overlaps no earlier label.
-    const overlaps = (x: number, y: number) => placed.some((p) =>
-      Math.abs(p.x - x) < (p.w + w) / 2 + GAP && Math.abs(p.y - y) < (p.h + h) / 2 + GAP);
-    let x = x0, y = y0;
+    const overlaps = (x: number, y: number) =>
+      placed.some(
+        (p) =>
+          Math.abs(p.x - x) < (p.w + w) / 2 + GAP &&
+          Math.abs(p.y - y) < (p.h + h) / 2 + GAP,
+      );
+    let x = x0,
+      y = y0;
     for (let k = 1; k <= 20 && overlaps(x, y); k++) {
       const step = (k % 2 ? 1 : -1) * Math.ceil(k / 2);
       if (slideY) y = Math.min(maxY, Math.max(minY, y0 + step * (h + GAP)));
@@ -493,17 +671,24 @@ function changeBadge(r: LeaderRow): string {
 function renderBoard(s: HostState, fresh: boolean): void {
   if (!fresh) return;
   $(".board-title").textContent = t("leaderboard");
-  $(".board-round").textContent = t("round", { i: s.round_index + 1, n: s.round_count });
+  $(".board-round").textContent = t("round", {
+    i: s.round_index + 1,
+    n: s.round_count,
+  });
   const rows = (s.leaderboard ?? []).slice(0, 10);
   const max = Math.max(1, ...rows.map((r) => r.total));
-  $(".board-list").innerHTML = rows.map((r, i) => `
+  $(".board-list").innerHTML = rows
+    .map(
+      (r, i) => `
     <li style="--i:${rows.length - i}; --w:${(r.total / max) * 100}%">
       <span class="b-rank tabular">${r.rank}</span>
       ${changeBadge(r)}
       <span class="b-name">${avatarSpan(r.avatar)}${esc(r.name)}</span>
       <span class="b-round tabular">${r.round_points ? `+${esc(formatNumber(r.round_points))}` : ""}</span>
       <span class="b-total tabular">${esc(formatNumber(r.total))}</span>
-    </li>`).join("");
+    </li>`,
+    )
+    .join("");
 }
 
 function renderFinal(s: HostState, fresh: boolean): void {
@@ -512,18 +697,28 @@ function renderFinal(s: HostState, fresh: boolean): void {
   const rows = s.leaderboard ?? [];
   const top = rows.slice(0, 3);
   const order = [top[1], top[0], top[2]].filter(Boolean) as LeaderRow[];
-  $(".podium").innerHTML = order.map((r) => `
+  $(".podium").innerHTML = order
+    .map(
+      (r) => `
     <div class="step step-${r.rank <= 3 ? r.rank : 3}">
       ${avatarSpan(r.avatar, "step-avatar")}
       <div class="step-name display">${esc(r.name)}</div>
       <div class="step-points tabular">${esc(formatNumber(r.total))}</div>
       <div class="step-block display">${r.rank}</div>
-    </div>`).join("");
-  $(".final-rest").innerHTML = rows.slice(3, 10).map((r) => `
-    <li><span class="tabular">${r.rank}.</span> ${avatarSpan(r.avatar)}${esc(r.name)} <span class="muted tabular">${esc(formatNumber(r.total))}</span></li>`).join("");
+    </div>`,
+    )
+    .join("");
+  $(".final-rest").innerHTML = rows
+    .slice(3, 10)
+    .map(
+      (r) => `
+    <li><span class="tabular">${r.rank}.</span> ${avatarSpan(r.avatar)}${esc(r.name)} <span class="muted tabular">${esc(formatNumber(r.total))}</span></li>`,
+    )
+    .join("");
 
   const colors = ["#9c4a5a", "#b8913e", "#f4e3e5", "#2f5d7c", "#ffffff"];
-  const burst = (x: number) => confetti({ particleCount: 90, spread: 70, origin: { x, y: 0.6 }, colors });
+  const burst = (x: number) =>
+    confetti({ particleCount: 90, spread: 70, origin: { x, y: 0.6 }, colors });
   setTimeout(() => burst(0.5), 900);
   setTimeout(() => burst(0.25), 1300);
   setTimeout(() => burst(0.75), 1600);
@@ -544,14 +739,17 @@ function renderHint(s: HostState): void {
 }
 
 function renderDock(s: HostState): void {
-  const btn = (act: string) => $<HTMLButtonElement>(`[data-act="${act}"]`, dock);
+  const btn = (act: string) =>
+    $<HTMLButtonElement>(`[data-act="${act}"]`, dock);
   btn("advance").textContent = `${t("next")} →`;
-  btn("advance").disabled = s.phase === "final" || (s.phase === "lobby" && s.round_count === 0);
+  btn("advance").disabled =
+    s.phase === "final" || (s.phase === "lobby" && s.round_count === 0);
   btn("extend").textContent = t("extend");
   btn("extend").hidden = s.phase !== "question";
   btn("close").textContent = t("closeRound");
   btn("close").hidden = s.phase !== "question" || s.closed;
-  btn("players").textContent = `${t("players")} (${s.connected_count}/${s.players.length})`;
+  btn("players").textContent =
+    `${t("players")} (${s.connected_count}/${s.players.length})`;
   btn("lang").textContent = lang() === "cs" ? "EN" : "CZ";
   btn("reset").textContent = t("resetScores");
   btn("reset_all").textContent = t("resetAll");
@@ -560,10 +758,14 @@ function renderDock(s: HostState): void {
 function renderDrawer(s: HostState): void {
   if (drawer.hidden) return;
   $(".drawer-title").textContent = `${t("players")} (${s.players.length})`;
-  $(".drawer-list").innerHTML = s.players.map((p) => `
+  $(".drawer-list").innerHTML = s.players
+    .map(
+      (p) => `
     <li><span class="dot ${p.connected ? "on" : ""}" title="${esc(p.connected ? t("online") : t("offline"))}"></span>
       <span class="d-name">${avatarSpan(p.avatar)}${esc(p.name)}</span>
-      <button class="btn btn-small btn-danger" data-kick="${esc(p.id)}" data-name="${esc(p.name)}">${esc(t("kick"))}</button></li>`).join("");
+      <button class="btn btn-small btn-danger" data-kick="${esc(p.id)}" data-name="${esc(p.name)}">${esc(t("kick"))}</button></li>`,
+    )
+    .join("");
 }
 
 // ------------------------------------------------------------------ timer
@@ -592,20 +794,30 @@ function advance(): void {
 }
 
 dock.addEventListener("click", (ev) => {
-  const act = (ev.target as HTMLElement).closest<HTMLElement>("[data-act]")?.dataset.act;
+  const act = (ev.target as HTMLElement).closest<HTMLElement>("[data-act]")
+    ?.dataset.act;
   if (!act) return;
   switch (act) {
-    case "advance": advance(); break;
-    case "players": togglePlayers(); break;
-    case "lang": toggleLang(); break;
-    case "fullscreen": toggleFullscreen(); break;
+    case "advance":
+      advance();
+      break;
+    case "players":
+      togglePlayers();
+      break;
+    case "lang":
+      toggleLang();
+      break;
+    case "fullscreen":
+      toggleFullscreen();
+      break;
     case "reset":
       if (confirm(t("confirmReset"))) send("reset");
       break;
     case "reset_all":
       if (confirm(t("confirmResetAll"))) send("reset_all");
       break;
-    default: send(act);
+    default:
+      send(act);
   }
   (ev.target as HTMLElement).closest("details")?.removeAttribute("open");
 });
@@ -633,14 +845,29 @@ document.addEventListener("keydown", (ev) => {
   if (ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
   if ((ev.target as HTMLElement).closest("input, textarea, select")) return;
   switch (ev.key) {
-    case "ArrowRight": case "PageDown": case " ": case "Enter":
+    case "ArrowRight":
+    case "PageDown":
+    case " ":
+    case "Enter":
       ev.preventDefault();
       advance();
       break;
-    case "f": case "F": toggleFullscreen(); break;
-    case "l": case "L": toggleLang(); break;
-    case "e": case "E": if (state?.phase === "question") send("extend"); break;
-    case "p": case "P": togglePlayers(); break;
+    case "f":
+    case "F":
+      toggleFullscreen();
+      break;
+    case "l":
+    case "L":
+      toggleLang();
+      break;
+    case "e":
+    case "E":
+      if (state?.phase === "question") send("extend");
+      break;
+    case "p":
+    case "P":
+      togglePlayers();
+      break;
   }
 });
 
@@ -650,7 +877,8 @@ function wake(): void {
   document.body.classList.remove("idle");
   clearTimeout(idleTimer);
   idleTimer = window.setTimeout(() => {
-    if (!dock.matches(":hover") && drawer.hidden) document.body.classList.add("idle");
+    if (!dock.matches(":hover") && drawer.hidden)
+      document.body.classList.add("idle");
   }, 3000);
 }
 document.addEventListener("mousemove", wake);
