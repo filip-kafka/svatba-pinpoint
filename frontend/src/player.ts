@@ -339,7 +339,7 @@ function renderReveal(s: PlayerState): void {
       const round = s.round_index;
       flyThen(
         m,
-        () => m.flyToBounds(L.latLngBounds([g, answer]), { ...thumbPadding(48), maxZoom: 12, duration: 1.2 }),
+        () => m.flyToBounds(L.latLngBounds([g, answer]), { ...thumbPadding(48), maxZoom: 16, duration: 1.2 }),
         () => {
           if (revealedRound !== round || state?.phase !== "reveal") return;
           L.polyline([g, answer], {

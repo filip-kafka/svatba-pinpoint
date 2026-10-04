@@ -34,6 +34,21 @@ When the mouse is idle, the control bar hides itself. Move the mouse to bring it
 The scale also sets how close the reveal zooms in on the answer: a regional view for World, street level for City.
 Any of the five closest guesses that is outside the zoomed-in view gets an arrow at the screen edge pointing to it, with the name and distance.
 
+**Close-up:** if the closest guess is near enough that zooming further in would help (at least one zoom
+level), the map pauses on that view and then dives in until the answer and the closest guess fill the
+screen, down to street level. Tune it with `CLOSE_UP` in `frontend/src/host.ts`:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `maxZoom` | 16 | closest the dive goes (13 ≈ a city, 16 ≈ streets and buildings) |
+| `minGain` | 1 | dive only if it gets at least this many zoom levels closer; raise it to dive less often |
+| `pauseMs` | 1400 | how long the regional view stays before the dive |
+| `duration` | 2.2 | seconds the dive takes |
+| `margin` | 170, 150 | pixels kept free around the pair; bigger = less tight |
+
+The first landing zoom per Scoring is `REVEAL_ZOOM` right above it. The phones' own reveal (your guess and
+the answer) zooms in up to the same street level.
+
 Points count toward the leaderboard only at the reveal, so nobody can tell how close they were before the answer is shown.
 
 ## Preparing the photos

@@ -205,6 +205,33 @@ const revealLayer = L.layerGroup();
 /** How far the reveal zooms in, by the photo's scoring scale (admin → Scoring). */
 const REVEAL_ZOOM: Record<Scale, number> = { world: 7, continent: 8, country: 9, city: 13 };
 
+/**
+ * The close-up. After landing on the answer at REVEAL_ZOOM, if the closest guess
+ * is near enough, the map pauses and then dives in until the answer and that
+ * guess fill the free part of the screen - so a great guess gets a big moment.
+ */
+const CLOSE_UP = {
+  maxZoom: 16,          // never closer than this (13 ≈ a city, 16 ≈ streets and buildings)
+  minGain: 1,           // only dive if it gets at least this many zoom levels closer
+  pauseMs: 1400,        // how long the regional view stays before the dive
+  duration: 2.2,        // seconds the dive takes
+  margin: [170, 150] as L.PointTuple, // px kept free around the pair for pins and names
+};
+
+/** Where the close-up would go, or null if it isn't worth diving for. */
+function closeUpPlan(m: L.Map, answer: L.LatLng, closest: L.LatLng | undefined, baseZoom: number) {
+  if (!closest) return null;
+  const bounds = L.latLngBounds([answer, closest]);
+  const topLeft: L.PointTuple = [CLOSE_UP.margin[0], CLOSE_UP.margin[1]];
+  const bottomRight: L.PointTuple = [panelInset() + CLOSE_UP.margin[0], CLOSE_UP.margin[1] + 60]; // + the hint line
+  const zoom = Math.min(
+    CLOSE_UP.maxZoom,
+    m.getBoundsZoom(bounds, false, L.point(topLeft).add(bottomRight)),
+  );
+  if (zoom < baseZoom + CLOSE_UP.minGain) return null;
+  return { bounds, zoom, options: { paddingTopLeft: topLeft, paddingBottomRight: bottomRight, maxZoom: CLOSE_UP.maxZoom } };
+}
+
 // ------------------------------------------------------------ map preload
 
 let preloadedCount = -1;
@@ -305,18 +332,39 @@ function renderReveal(s: HostState): void {
 
   m.setView([25, 10], 1.6, { animate: false });
   const token = ++revealToken;
+  const zoom = REVEAL_ZOOM[a.scale] ?? REVEAL_ZOOM.world;
+  const closeUp = closeUpPlan(m, answer, guesses[0]?.ll, zoom);
+  if (closeUp) {
+    // Start downloading the close-up now; the first flight and the pause give it ~3.5 s.
+    const c = closeUp.bounds.getCenter();
+    const w = window.innerWidth * 1.3, h = window.innerHeight;
+    void preloadViews([
+      { lat: c.lat, lng: c.lng, zoom: closeUp.zoom, width: w, height: h },
+      { lat: c.lat, lng: c.lng, zoom: closeUp.zoom - 1, width: w, height: h },
+    ], { urgent: true });
+  }
+
+  const finish = () => {
+    flying = false;
+    if (token !== revealToken) return;
+    drawLines();
+    renderPointers();
+  };
+
   setTimeout(() => {
     if (token !== revealToken) return; // a newer reveal (or language switch) took over
     const duration = 1.8;
-    const zoom = REVEAL_ZOOM[a.scale] ?? REVEAL_ZOOM.world;
     // Centre the answer in the part of the map the side panel doesn't cover.
     const center = m.unproject(m.project(answer, zoom).add([panelInset() / 2, 0]), zoom);
     flying = true;
     flyThen(m, () => m.flyTo(center, zoom, { duration }), () => {
-      flying = false;
-      if (token !== revealToken) return;
-      drawLines();
-      renderPointers();
+      if (token !== revealToken || !closeUp) return finish();
+      // Let everyone take in the regional view, then dive to the closest guess.
+      setTimeout(() => {
+        if (token !== revealToken) return;
+        flyThen(m, () => m.flyToBounds(closeUp.bounds, { ...closeUp.options, duration: CLOSE_UP.duration }),
+          finish, CLOSE_UP.duration);
+      }, CLOSE_UP.pauseMs);
     }, duration);
   }, 350);
 
