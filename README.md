@@ -156,8 +156,11 @@ Then pick one of these:
 docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
 ```
 
-**B. You already have one** (Nginx Proxy Manager, Traefik, …). Run `docker compose up -d --build` and
-proxy your domain to `127.0.0.1:8000` with **WebSocket support enabled**. If the proxy runs in Docker itself, drop the `ports:` mapping and put both containers on the same network.
+**B. You already have one** (Caddy, Nginx Proxy Manager, Traefik, …). Run `docker compose up -d --build` and
+proxy your domain to `127.0.0.1:8000` with **WebSocket support enabled** (Caddy's `reverse_proxy` does that
+by itself; add `encode zstd gzip` to shrink the first page load). If port 8000 is taken (Portainer uses it
+by default), set `PINPOINT_PORT=8090` in `.env` and proxy to that. If the proxy runs in Docker itself, put
+both containers on the same network and proxy to `pinpoint:8000`.
 
 **In Portainer:** add a Stack from the Git repository and set `PINPOINT_ADMIN_TOKEN` (and `PINPOINT_DOMAIN`) as stack environment variables.
 
